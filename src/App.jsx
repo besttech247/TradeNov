@@ -4,16 +4,7 @@ import { TopNav } from './shared/components/TopNav';
 import TADashboard from './pages/ta/Dashboard';
 import ApiHub from './pages/dev/ApiHub';
 
-// Placeholder Components for Agents
-const ProApp = () => (
-  <div className="px-8 pb-8">
-    <TopNav title="TradeNov PRO" />
-    <div className="p-8 glass-panel text-center">
-      <h1 className="text-3xl font-bold text-primary">💼 TradeNov PRO</h1>
-      <p className="text-text-muted mt-2">Agent PRO will build the Trading Terminal and Portfolio here.</p>
-    </div>
-  </div>
-);
+import ProApp from './pages/pro/ProApp';
 
 const AgentApp = () => (
   <div className="px-8 pb-8">
