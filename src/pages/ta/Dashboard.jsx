@@ -11,8 +11,9 @@ import {
   Area,
   ReferenceArea
 } from 'recharts';
-import { Search, Eye, EyeOff, ChevronDown, ChevronUp, CheckCircle2, XCircle, BarChart3, SlidersHorizontal } from 'lucide-react';
+import { Search, Eye, EyeOff, ChevronDown, ChevronUp, CheckCircle2, XCircle, BarChart3, SlidersHorizontal, Activity, TrendingUp, DollarSign, ArrowRightLeft } from 'lucide-react';
 import { Button } from '../../shared/components/Button';
+import { TopNav } from '../../shared/components/TopNav';
 
 // ========== INDICATOR REGISTRY ==========
 const INDICATOR_REGISTRY = [
@@ -44,6 +45,8 @@ export default function Dashboard() {
   });
   const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
 
+  const [livePrices, setLivePrices] = useState(null);
+
   useEffect(() => {
     fetch('/api/ta/cot')
       .then(res => res.json())
@@ -55,6 +58,15 @@ export default function Dashboard() {
         console.error(err);
         setLoading(false);
       });
+
+    fetch('/api/shared/prices')
+      .then(res => res.json())
+      .then(d => {
+        if (d.status === 'success') {
+          setLivePrices(d.data);
+        }
+      })
+      .catch(err => console.error("Error fetching live prices:", err));
   }, []);
 
   const toggleIndicator = (id) => {
@@ -193,41 +205,65 @@ export default function Dashboard() {
 
   const latest = formattedData[formattedData.length - 1] || {};
   const prev = formattedData[formattedData.length - 2] || {};
-  const pctChange = latest.Spot && prev.Spot ? ((latest.Spot - prev.Spot) / prev.Spot * 100).toFixed(2) : '0.00';
+  
+  // Use live price if available, otherwise fallback to latest Spot
+  const displayGoldPrice = livePrices?.GOLD || latest.Spot;
+  const pctChange = displayGoldPrice && prev.Spot ? ((displayGoldPrice - prev.Spot) / prev.Spot * 100).toFixed(2) : '0.00';
 
   const activeStrategyObj = strategyDetails.find(s => s.id === selectedStrategyId);
   const hasOscillator = INDICATOR_REGISTRY.some(ind => activeIndicators[ind.id] && ind.yAxis === 'osc');
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto text-text-main animate-in fade-in duration-500">
+      <TopNav title="Technical Analysis & Macro Data" />
       
-      {/* High-Level Summary */}
-      <div className="glass-panel p-6 mb-8 flex flex-wrap justify-between items-center gap-6 rounded-2xl border border-white/10 bg-background-panel/50 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <span className={`px-4 py-2 rounded-full text-sm font-bold tracking-wide border 
-            ${consensus === 'BUY' ? 'bg-success/10 text-success border-success/30' : 
-              consensus === 'MIXED' ? 'bg-warning/10 text-warning border-warning/30' : 
-              'bg-danger/10 text-danger border-danger/30'}`}>
-            {consensus === 'BUY' ? '🟢 BUY OPPORTUNITY' : consensus === 'MIXED' ? '🟡 MIXED SIGNALS' : '🔴 WAIT / NO SIGNAL'}
-          </span>
-          <div>
-            <h1 className="text-2xl font-bold m-0">Gold Decision Summary</h1>
-            <p className="text-text-muted text-sm m-0">
-              {buyCount} of {totalStrats} Strategies confirming a Buy • Weekly Snapshot for Gold Spot (${latest.Spot?.toLocaleString()})
-            </p>
+      {/* High-Level Summary & Macro Cards */}
+      <div className="flex flex-col gap-6 mb-8">
+        
+        {/* Consensus Row */}
+        <div className="glass-panel p-6 flex flex-wrap justify-between items-center gap-6 rounded-2xl border border-white/10 bg-background-panel/50 backdrop-blur-md">
+          <div className="flex items-center gap-4">
+            <span className={`px-4 py-2 rounded-full text-sm font-bold tracking-wide border 
+              ${consensus === 'BUY' ? 'bg-success/10 text-success border-success/30' : 
+                consensus === 'MIXED' ? 'bg-warning/10 text-warning border-warning/30' : 
+                'bg-danger/10 text-danger border-danger/30'}`}>
+              {consensus === 'BUY' ? '🟢 BUY OPPORTUNITY' : consensus === 'MIXED' ? '🟡 MIXED SIGNALS' : '🔴 WAIT / NO SIGNAL'}
+            </span>
+            <div>
+              <h1 className="text-2xl font-bold m-0">Gold Decision Summary</h1>
+              <p className="text-text-muted text-sm m-0">
+                {buyCount} of {totalStrats} Strategies confirming a Buy • Live Analysis
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-4">
-          <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl flex flex-col items-end">
-            <span className="text-xs text-text-muted uppercase">Spot Price</span>
-            <span className="text-xl font-bold">${latest.Spot?.toLocaleString()}</span>
-          </div>
-          <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl flex flex-col items-end">
-            <span className="text-xs text-text-muted uppercase">Weekly Change</span>
-            <span className={`text-xl font-bold ${parseFloat(pctChange) >= 0 ? 'text-success' : 'text-danger'}`}>
-              {parseFloat(pctChange) >= 0 ? '+' : ''}{pctChange}%
+        {/* Live Prices & Macro Indicators Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white/5 border border-primary/20 px-5 py-4 rounded-xl flex flex-col items-center text-center shadow-[0_0_15px_rgba(0,240,255,0.05)]">
+            <span className="text-xs text-text-muted uppercase flex items-center gap-2 mb-1"><DollarSign size={14} className="text-primary" /> Live Gold (Spot)</span>
+            <span className="text-2xl font-bold">${displayGoldPrice?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            <span className={`text-xs font-bold mt-1 ${parseFloat(pctChange) >= 0 ? 'text-success' : 'text-danger'}`}>
+              {parseFloat(pctChange) >= 0 ? '▲' : '▼'} {Math.abs(pctChange)}%
             </span>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 px-5 py-4 rounded-xl flex flex-col items-center text-center hover:bg-white/10 transition-colors">
+            <span className="text-xs text-text-muted uppercase flex items-center gap-2 mb-1"><Activity size={14} className="text-accent" /> DXY (Dollar Index)</span>
+            <span className="text-2xl font-bold">{latest.DXY?.toFixed(2) || '---'}</span>
+            <span className="text-xs text-text-muted mt-1">Macro Headwind</span>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 px-5 py-4 rounded-xl flex flex-col items-center text-center hover:bg-white/10 transition-colors">
+            <span className="text-xs text-text-muted uppercase flex items-center gap-2 mb-1"><TrendingUp size={14} className="text-danger" /> US10Y Yields</span>
+            <span className="text-2xl font-bold">{latest.US10Y?.toFixed(2) || '---'}%</span>
+            <span className="text-xs text-text-muted mt-1">Opportunity Cost</span>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 px-5 py-4 rounded-xl flex flex-col items-center text-center hover:bg-white/10 transition-colors">
+            <span className="text-xs text-text-muted uppercase flex items-center gap-2 mb-1"><ArrowRightLeft size={14} className="text-warning" /> Gold/Silver Ratio</span>
+            <span className="text-2xl font-bold">{latest.GoldSilverRatio?.toFixed(2) || (latest.Spot && latest.Silver ? (latest.Spot/latest.Silver).toFixed(2) : '---')}</span>
+            <span className="text-xs text-text-muted mt-1">Physical Tightness</span>
           </div>
         </div>
       </div>
