@@ -1,12 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 
-// Placeholder Components for Agents
+import Dashboard from './pages/ta/Dashboard';
+
 const TAApp = () => (
-  <div className="p-8">
-    <h1 className="text-3xl font-bold text-success">📈 TradeNov TA</h1>
-    <p className="text-text-muted mt-2">Agent TA will build the Technical Analysis and COT dashboard here.</p>
-  </div>
+  <Dashboard />
 );
 
 const ProApp = () => (
