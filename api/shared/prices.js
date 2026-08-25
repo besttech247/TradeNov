@@ -19,15 +19,12 @@ export default async function handler(req, res) {
       const goldData = await goldRes.json();
       liveGoldPrice = goldData.chart.result[0].meta.regularMarketPrice;
     } else {
-      // Fallback in case Yahoo blocks the server
-      liveGoldPrice = 2500.00; // Just a safe fallback
+      liveGoldPrice = 2500.00; // Fallback
     }
 
-    // 2. جلب أسعار الكريبتو من Binance مع URL Encoding صحيح للأقواس
-    const symbols = encodeURIComponent('["BTCUSDT","ETHUSDT","SOLUSDT"]');
-    const cryptoRes = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbols}`);
-    
-    if (!cryptoRes.ok) throw new Error(`Binance returned ${cryptoRes.status}`);
+    // 2. جلب أسعار الكريبتو من MEXC (لتجنب حظر Binance للسيرفرات الأمريكية)
+    const cryptoRes = await fetch('https://api.mexc.com/api/v3/ticker/price');
+    if (!cryptoRes.ok) throw new Error(`MEXC returned ${cryptoRes.status}`);
     const cryptoData = await cryptoRes.json();
     
     const prices = {
