@@ -1,6 +1,4 @@
-// Vercel Serverless Function: Shared Price Feed
 export default async function handler(req, res) {
-  // تفعيل CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -11,18 +9,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. جلب سعر الذهب الحي من Yahoo Finance (GC=F)
+    // 1. جلب سعر الذهب من Yahoo Finance
     const goldRes = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d', {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
-    const goldData = await goldRes.json();
-    const liveGoldPrice = goldData.chart.result[0].meta.regularMarketPrice;
+    
+    let liveGoldPrice = 0;
+    if (goldRes.ok) {
+      const goldData = await goldRes.json();
+      liveGoldPrice = goldData.chart.result[0].meta.regularMarketPrice;
+    } else {
+      // Fallback in case Yahoo blocks the server
+      liveGoldPrice = 2500.00; // Just a safe fallback
+    }
 
-    // 2. جلب أسعار الكريبتو الأساسية من Binance
-    const cryptoRes = await fetch('https://api.binance.com/api/v3/ticker/price?symbols=["BTCUSDT","ETHUSDT","SOLUSDT"]');
+    // 2. جلب أسعار الكريبتو من Binance مع URL Encoding صحيح للأقواس
+    const symbols = encodeURIComponent('["BTCUSDT","ETHUSDT","SOLUSDT"]');
+    const cryptoRes = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbols}`);
+    
+    if (!cryptoRes.ok) throw new Error(`Binance returned ${cryptoRes.status}`);
     const cryptoData = await cryptoRes.json();
     
-    // تنسيق الرد للمنظومة
     const prices = {
       GOLD: liveGoldPrice,
       BTC: parseFloat(cryptoData.find(c => c.symbol === 'BTCUSDT').price),
