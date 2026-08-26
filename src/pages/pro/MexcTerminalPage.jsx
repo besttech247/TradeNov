@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Send, Wallet, ArrowLeftRight, Activity } from 'lucide-react';
-import { calculateCoinPortfolio, calculateOverviewMetrics } from '../../shared/utils/mathEngine';
+import { calculateCoinPortfolio, calculateOverviewMetrics } from './utils/mathEngine';
 
-export default function Terminal() {
+export default function MexcTerminalPage() {
   const [livePrices, setLivePrices] = useState({ BTC: 63200, ETH: 3450, SOL: 143.80 });
   const [selectedPair, setSelectedPair] = useState('BTC');
   const [orderType, setOrderType] = useState('BUY');
@@ -68,13 +68,18 @@ export default function Terminal() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+      <div className="flex items-center gap-2 mb-6">
+        <Activity className="w-6 h-6 text-cyan-400" />
+        <h1 className="text-xl font-bold">MEXC Trading Terminal</h1>
+      </div>
+
       {/* Portfolio Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-panel p-5 rounded-2xl">
-          <div className="flex items-center justify-between text-text-muted mb-2">
+          <div className="flex items-center justify-between text-gray-400 mb-2">
             <span className="text-xs font-bold">Total Portfolio (Net Worth)</span>
-            <Wallet className="w-4 h-4 text-primary" />
+            <Wallet className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="text-2xl font-black text-white">
             ${overview.totalPortfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -82,7 +87,7 @@ export default function Terminal() {
         </div>
 
         <div className="glass-panel p-5 rounded-2xl">
-          <div className="flex items-center justify-between text-text-muted mb-2">
+          <div className="flex items-center justify-between text-gray-400 mb-2">
             <span className="text-xs font-bold">Cash Balance</span>
             <Wallet className="w-4 h-4 text-emerald-400" />
           </div>
@@ -92,7 +97,7 @@ export default function Terminal() {
         </div>
 
         <div className="glass-panel p-5 rounded-2xl">
-          <div className="flex items-center justify-between text-text-muted mb-2">
+          <div className="flex items-center justify-between text-gray-400 mb-2">
             <span className="text-xs font-bold">Invested Value</span>
             <Activity className="w-4 h-4 text-blue-400" />
           </div>
@@ -102,11 +107,11 @@ export default function Terminal() {
         </div>
 
         <div className="glass-panel p-5 rounded-2xl">
-          <div className="flex items-center justify-between text-text-muted mb-2">
+          <div className="flex items-center justify-between text-gray-400 mb-2">
             <span className="text-xs font-bold">Unrealized PnL</span>
-            <TrendingUp className="w-4 h-4 text-success" />
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className={`text-2xl font-black ${overview.totalUnrealizedPnlUsd >= 0 ? 'text-success' : 'text-danger'}`}>
+          <div className={`text-2xl font-black ${overview.totalUnrealizedPnlUsd >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {overview.totalUnrealizedPnlUsd >= 0 ? '+' : ''}${overview.totalUnrealizedPnlUsd.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </div>
         </div>
@@ -119,18 +124,18 @@ export default function Terminal() {
           <div>
             <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
               <h3 className="text-sm font-black text-white flex items-center gap-2">
-                <ArrowLeftRight className="w-4 h-4 text-primary" /> 
+                <ArrowLeftRight className="w-4 h-4 text-cyan-400" /> 
                 Terminal (Spot)
               </h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 p-1 bg-background/50 rounded-xl mb-4">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-black/20 rounded-xl mb-4">
               <button
                 onClick={() => setOrderType('BUY')}
                 className={`py-2 rounded-lg font-bold text-xs transition-all ${
                   orderType === 'BUY'
-                    ? 'bg-success text-white'
-                    : 'text-text-muted hover:text-white'
+                    ? 'bg-emerald-500 text-white'
+                    : 'text-gray-400 hover:text-white'
                 }`}
               >
                 BUY
@@ -139,8 +144,8 @@ export default function Terminal() {
                 onClick={() => setOrderType('SELL')}
                 className={`py-2 rounded-lg font-bold text-xs transition-all ${
                   orderType === 'SELL'
-                    ? 'bg-danger text-white'
-                    : 'text-text-muted hover:text-white'
+                    ? 'bg-red-500 text-white'
+                    : 'text-gray-400 hover:text-white'
                 }`}
               >
                 SELL
@@ -149,11 +154,11 @@ export default function Terminal() {
 
             <form onSubmit={handlePlaceOrder} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-text-muted mb-1">Pair</label>
+                <label className="block font-bold text-gray-400 mb-1">Pair</label>
                 <select
                   value={selectedPair}
                   onChange={(e) => setSelectedPair(e.target.value)}
-                  className="w-full bg-background/50 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-primary font-bold"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-400 font-bold"
                 >
                   <option value="BTC">BTC/USDT (${livePrices.BTC?.toLocaleString()})</option>
                   <option value="ETH">ETH/USDT (${livePrices.ETH?.toLocaleString()})</option>
@@ -162,33 +167,33 @@ export default function Terminal() {
               </div>
 
               <div>
-                <label className="block font-bold text-text-muted mb-1">Price (USDT)</label>
+                <label className="block font-bold text-gray-400 mb-1">Price (USDT)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={price}
                   onChange={(e) => setPrice(parseFloat(e.target.value))}
-                  className="w-full bg-background/50 border border-white/10 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-primary"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-text-muted mb-1">Amount</label>
+                <label className="block font-bold text-gray-400 mb-1">Amount</label>
                 <input
                   type="number"
                   step="0.001"
                   value={amount}
                   onChange={(e) => setAmount(parseFloat(e.target.value))}
-                  className="w-full bg-background/50 border border-white/10 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-primary"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
                 />
               </div>
 
-              <div className="bg-background/50 p-3 rounded-xl border border-white/10 space-y-1">
-                <div className="flex justify-between text-text-muted font-medium">
+              <div className="bg-black/20 p-3 rounded-xl border border-white/10 space-y-1">
+                <div className="flex justify-between text-gray-400 font-medium">
                   <span>Total:</span>
                   <strong className="text-white font-mono font-bold">${total.toFixed(2)} USDT</strong>
                 </div>
-                <div className="flex justify-between text-text-muted font-medium">
+                <div className="flex justify-between text-gray-400 font-medium">
                   <span>Est. Fee (0.1%):</span>
                   <span className="text-white font-mono">${(total * 0.001).toFixed(2)}</span>
                 </div>
@@ -198,8 +203,8 @@ export default function Terminal() {
                 type="submit"
                 className={`w-full py-3 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 ${
                   orderType === 'BUY' 
-                    ? 'bg-success hover:bg-success/80 shadow-[0_0_15px_rgba(0,255,136,0.2)]' 
-                    : 'bg-danger hover:bg-danger/80 shadow-[0_0_15px_rgba(255,51,102,0.2)]'
+                    ? 'bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' 
+                    : 'bg-red-500 hover:bg-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
                 }`}
               >
                 <Send className="w-4 h-4" />
@@ -212,13 +217,13 @@ export default function Terminal() {
         {/* Portfolio Assets */}
         <div className="lg:col-span-2 glass-panel p-6 rounded-2xl">
           <h3 className="text-sm font-black text-white flex items-center gap-2 mb-4">
-            <Wallet className="w-4 h-4 text-primary" />
+            <Wallet className="w-4 h-4 text-cyan-400" />
             Asset Portfolio & PnL
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="text-text-muted border-b border-white/10 pb-2">
+                <tr className="text-gray-400 border-b border-white/10 pb-2">
                   <th className="pb-3 font-bold">Asset</th>
                   <th className="pb-3 font-bold">Balance</th>
                   <th className="pb-3 font-bold">Avg Cost</th>
@@ -236,7 +241,7 @@ export default function Terminal() {
                     <td className="py-3 font-mono">${asset.averageCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="py-3 font-mono">${asset.livePrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="py-3">
-                      <div className={`font-mono font-bold ${asset.unrealizedPnlUsd >= 0 ? 'text-success' : 'text-danger'}`}>
+                      <div className={`font-mono font-bold ${asset.unrealizedPnlUsd >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         {asset.unrealizedPnlUsd >= 0 ? '+' : ''}${asset.unrealizedPnlUsd.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         <span className="text-[10px] ml-1">({asset.unrealizedPnlPct.toFixed(2)}%)</span>
                       </div>
@@ -245,7 +250,7 @@ export default function Terminal() {
                 ))}
                 {coinPortfolios.length === 0 && (
                   <tr>
-                    <td colSpan="5" className="py-6 text-center text-text-muted">No assets in portfolio</td>
+                    <td colSpan="5" className="py-6 text-center text-gray-400">No assets in portfolio</td>
                   </tr>
                 )}
               </tbody>

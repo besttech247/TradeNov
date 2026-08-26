@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Key, Plus, Trash2 } from 'lucide-react';
 
-export default function Keys() {
+export default function KeysPage() {
   const [keys, setKeys] = useState([]);
   const [exchange, setExchange] = useState('binance');
   const [apiKey, setApiKey] = useState('');
@@ -14,8 +14,6 @@ export default function Keys() {
 
   const fetchKeys = async () => {
     try {
-      // Dummy fetch for now since we are purely frontend, 
-      // but it will hit the real API in Vercel.
       const res = await fetch('/api/pro/keys');
       if (res.ok) {
         const data = await res.json();
@@ -63,20 +61,25 @@ export default function Keys() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-4xl">
+      <div className="flex items-center gap-2 mb-6">
+        <Key className="w-6 h-6 text-cyan-400" />
+        <h1 className="text-xl font-bold">API Keys Management</h1>
+      </div>
+
       <div className="glass-panel p-6 rounded-2xl">
         <h3 className="text-sm font-black text-white flex items-center gap-2 mb-4">
-          <Key className="w-4 h-4 text-primary" />
+          <Key className="w-4 h-4 text-cyan-400" />
           Add API Key
         </h3>
         
         <form onSubmit={handleAddKey} className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs font-bold text-text-muted mb-1">Exchange</label>
+            <label className="block text-xs font-bold text-gray-400 mb-1">Exchange</label>
             <select
               value={exchange}
               onChange={(e) => setExchange(e.target.value)}
-              className="w-full bg-background/50 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-primary font-bold text-sm"
+              className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-400 font-bold text-sm"
             >
               <option value="binance">Binance</option>
               <option value="mexc">MEXC</option>
@@ -85,24 +88,24 @@ export default function Keys() {
           </div>
           
           <div className="md:col-span-1">
-            <label className="block text-xs font-bold text-text-muted mb-1">API Key</label>
+            <label className="block text-xs font-bold text-gray-400 mb-1">API Key</label>
             <input
               type="text"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              className="w-full bg-background/50 border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-primary"
+              className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-cyan-400"
               placeholder="Your API Key"
               required
             />
           </div>
 
           <div className="md:col-span-1">
-            <label className="block text-xs font-bold text-text-muted mb-1">API Secret</label>
+            <label className="block text-xs font-bold text-gray-400 mb-1">API Secret</label>
             <input
               type="password"
               value={apiSecret}
               onChange={(e) => setApiSecret(e.target.value)}
-              className="w-full bg-background/50 border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-primary"
+              className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-cyan-400"
               placeholder="Your API Secret"
               required
             />
@@ -112,7 +115,7 @@ export default function Keys() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 bg-primary hover:bg-primary/80 shadow-[0_0_15px_rgba(0,240,255,0.2)] disabled:opacity-50"
+              className="w-full py-2 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.2)] disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
               <span>Add Key</span>
@@ -123,17 +126,17 @@ export default function Keys() {
 
       <div className="glass-panel p-6 rounded-2xl">
         <h3 className="text-sm font-black text-white flex items-center gap-2 mb-4">
-          <Key className="w-4 h-4 text-primary" />
+          <Key className="w-4 h-4 text-cyan-400" />
           Saved API Keys
         </h3>
         
         {keys.length === 0 ? (
-          <p className="text-sm text-text-muted text-center py-4">No API keys added yet.</p>
+          <p className="text-sm text-gray-400 text-center py-4">No API keys added yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="text-text-muted border-b border-white/10 pb-2">
+                <tr className="text-gray-400 border-b border-white/10 pb-2">
                   <th className="pb-3 font-bold">Exchange</th>
                   <th className="pb-3 font-bold">API Key</th>
                   <th className="pb-3 font-bold">Status</th>
@@ -144,18 +147,18 @@ export default function Keys() {
                 {keys.map((k) => (
                   <tr key={k.id} className="hover:bg-white/5 transition-all">
                     <td className="py-3 font-bold capitalize">{k.exchange}</td>
-                    <td className="py-3 font-mono text-text-muted">
+                    <td className="py-3 font-mono text-gray-400">
                       {k.api_key.substring(0, 4)}...{k.api_key.substring(k.api_key.length - 4)}
                     </td>
                     <td className="py-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-success/15 text-success">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400">
                         Active
                       </span>
                     </td>
                     <td className="py-3 text-right">
                       <button 
                         onClick={() => handleDelete(k.id)}
-                        className="p-1.5 text-text-muted hover:text-danger bg-background/50 hover:bg-white/5 border border-white/10 rounded-lg transition-all"
+                        className="p-1.5 text-gray-400 hover:text-red-400 bg-black/20 hover:bg-white/5 border border-white/10 rounded-lg transition-all"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
