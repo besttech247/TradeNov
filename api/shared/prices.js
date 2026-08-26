@@ -9,7 +9,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. جلب سعر الذهب من Yahoo Finance
     const goldRes = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d', {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
@@ -22,16 +21,28 @@ export default async function handler(req, res) {
       liveGoldPrice = 2500.00; // Fallback
     }
 
-    // 2. جلب أسعار الكريبتو من MEXC (لتجنب حظر Binance للسيرفرات الأمريكية)
-    const cryptoRes = await fetch('https://api.mexc.com/api/v3/ticker/price');
+    // 2. Fetch 24hr ticker data from MEXC for rich UI
+    const cryptoRes = await fetch('https://api.mexc.com/api/v3/ticker/24hr');
     if (!cryptoRes.ok) throw new Error(`MEXC returned ${cryptoRes.status}`);
     const cryptoData = await cryptoRes.json();
     
+    const findCrypto = (sym) => {
+      const c = cryptoData.find(x => x.symbol === sym);
+      return c ? {
+        price: parseFloat(c.lastPrice),
+        change24h: parseFloat(c.priceChangePercent),
+        volume: parseFloat(c.quoteVolume)
+      } : { price: 0, change24h: 0, volume: 0 };
+    };
+
     const prices = {
-      GOLD: liveGoldPrice,
-      BTC: parseFloat(cryptoData.find(c => c.symbol === 'BTCUSDT').price),
-      ETH: parseFloat(cryptoData.find(c => c.symbol === 'ETHUSDT').price),
-      SOL: parseFloat(cryptoData.find(c => c.symbol === 'SOLUSDT').price),
+      GOLD: { price: liveGoldPrice, change24h: 0, volume: 0 },
+      BTC: findCrypto('BTCUSDT'),
+      ETH: findCrypto('ETHUSDT'),
+      SOL: findCrypto('SOLUSDT'),
+      PEPE: findCrypto('PEPEUSDT'),
+      XRP: findCrypto('XRPUSDT'),
+      KAS: findCrypto('KASUSDT'),
       timestamp: new Date().toISOString()
     };
 

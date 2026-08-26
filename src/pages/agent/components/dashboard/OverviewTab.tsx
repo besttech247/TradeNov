@@ -25,24 +25,44 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 
-const pnlHistoryData = [
-  { time: '00:00', pnl: 120, btc: 61800 },
-  { time: '04:00', pnl: 240, btc: 62100 },
-  { time: '08:00', pnl: 180, btc: 61950 },
-  { time: '12:00', pnl: 390, btc: 62800 },
-  { time: '16:00', pnl: 520, btc: 63100 },
-  { time: '20:00', pnl: 480, btc: 62900 },
-  { time: 'الآن', pnl: 652.80, btc: 63200 },
-];
 
-const mexcVolatilityScannerData = [
-  { pair: 'PEPE/USDT', price: '$0.0000114', change24h: '+18.4%', volume: '$420M', volatilityScore: 'مرتفع جداً (9.4/10)', recommendedGrid: '40 مستوى (ربح 1.2%)' },
-  { pair: 'SOL/USDT', price: '$143.80', change24h: '+8.75%', volume: '$680M', volatilityScore: 'مرتفع (8.1/10)', recommendedGrid: '25 مستوى (ربح 0.8%)' },
-  { pair: 'KAS/USDT', price: '$0.174', change24h: '+12.3%', volume: '$150M', volatilityScore: 'مرتفع (8.6/10)', recommendedGrid: '30 مستوى (ربح 1.0%)' },
-  { pair: 'XRP/USDT', price: '$0.584', change24h: '+4.20%', volume: '$310M', volatilityScore: 'متوسط (6.5/10)', recommendedGrid: '18 مستوى (ربح 0.6%)' },
-];
+
+
 
 export const OverviewTab: React.FC = () => {
+
+  const [mexcVolatilityScannerData, setLiveScannerData] = useState<any[]>([{ pair: 'جاري التحميل...', price: '-', change24h: '-', volume: '-', volatilityScore: '-', recommendedGrid: '-' }]);
+  const [pnlHistoryData, setLivePnlData] = useState<any[]>([{ time: 'الآن', pnl: 0, btc: 60000 }]);
+
+  React.useEffect(() => {
+    fetch('/api/shared/prices')
+      .then(res => res.json())
+      .then(json => {
+        if (json.status === 'success') {
+          const d = json.data;
+          const formatMoney = (val: number) => '$' + (val >= 1000000 ? (val/1000000).toFixed(1) + 'M' : val.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6}));
+          const formatChange = (val: number) => (val > 0 ? '+' : '') + val.toFixed(2) + '%';
+          
+          setLiveScannerData([
+            { pair: 'PEPE/USDT', price: formatMoney(d.PEPE?.price || 0), change24h: formatChange(d.PEPE?.change24h || 0), volume: formatMoney(d.PEPE?.volume || 0), volatilityScore: 'مرتفع جداً (9.4/10)', recommendedGrid: '40 مستوى (ربح 1.2%)' },
+            { pair: 'SOL/USDT', price: formatMoney(d.SOL?.price || 0), change24h: formatChange(d.SOL?.change24h || 0), volume: formatMoney(d.SOL?.volume || 0), volatilityScore: 'مرتفع (8.1/10)', recommendedGrid: '25 مستوى (ربح 0.8%)' },
+            { pair: 'KAS/USDT', price: formatMoney(d.KAS?.price || 0), change24h: formatChange(d.KAS?.change24h || 0), volume: formatMoney(d.KAS?.volume || 0), volatilityScore: 'مرتفع (8.6/10)', recommendedGrid: '30 مستوى (ربح 1.0%)' },
+            { pair: 'XRP/USDT', price: formatMoney(d.XRP?.price || 0), change24h: formatChange(d.XRP?.change24h || 0), volume: formatMoney(d.XRP?.volume || 0), volatilityScore: 'متوسط (6.5/10)', recommendedGrid: '18 مستوى (ربح 0.6%)' }
+          ]);
+          setLivePnlData([
+            { time: '00:00', pnl: 0, btc: d.BTC?.price || 60000 },
+            { time: '04:00', pnl: 0, btc: d.BTC?.price || 60000 },
+            { time: '08:00', pnl: 0, btc: d.BTC?.price || 60000 },
+            { time: '12:00', pnl: 0, btc: d.BTC?.price || 60000 },
+            { time: '16:00', pnl: 0, btc: d.BTC?.price || 60000 },
+            { time: '20:00', pnl: 0, btc: d.BTC?.price || 60000 },
+            { time: 'الآن', pnl: 0, btc: d.BTC?.price || 60000 }
+          ]);
+        }
+      })
+      .catch(e => console.log('price error', e));
+  }, []);
+
   const { 
     mode, 
     theme, 
