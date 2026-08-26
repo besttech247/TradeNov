@@ -1,69 +1,62 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* Global Font Unification - Cairo Font for Arabic Everywhere */
+/* Global Font Unification */
 * {
   font-family: 'Cairo', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Theme Design Tokens */
-body.theme-dark {
+/* Theme Design Tokens - Unified with TradeNov Jiade Crypto Theme */
+body.theme-dark, :root {
   color-scheme: dark;
-  --bg-main: #0b0f19;
-  --bg-card: rgba(19, 27, 46, 0.85);
-  --bg-card-hover: rgba(26, 36, 61, 0.95);
-  --border-panel: rgba(255, 255, 255, 0.08);
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --input-bg: rgba(11, 15, 25, 0.7);
-  --input-border: rgba(255, 255, 255, 0.12);
-  --shadow-panel: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  
+  /* TradeNov Obsidian Colors */
+  --bg-main: #0B0E14;
+  --bg-card: rgba(21, 25, 36, 0.7);
+  --bg-card-hover: rgba(28, 33, 45, 0.85);
+  
+  /* Borders and Glass */
+  --border-panel: rgba(255, 255, 255, 0.05);
+  --border-panel-hover: rgba(0, 240, 255, 0.3);
+  
+  /* Typography */
+  --text-primary: #F8F9FA;
+  --text-secondary: #8B94A5;
+  
+  /* Inputs */
+  --input-bg: rgba(28, 33, 45, 0.6);
+  --input-border: rgba(255, 255, 255, 0.1);
+  
+  /* Shadows */
+  --shadow-panel: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  
+  /* Accent Colors (Jiade Theme) */
+  --accent-cyan: #00F0FF;
+  --accent-purple: #7E57C2;
 }
 
-/* Clean, High-Contrast Light Mode (Soft Silver Slate Background) */
-/* Clean, Harmonious Light Mode (Soft Silver Slate Background) */
-body.theme-light {
-  color-scheme: light;
-  --bg-main: #f8fafc;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f1f5f9;
-  --border-panel: #e2e8f0;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --input-bg: #ffffff;
-  --input-border: #cbd5e1;
-  --shadow-panel: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
-}
-
-body {
-  background-color: var(--bg-main) !important;
-  color: var(--text-primary) !important;
-  min-height: 100vh;
-  margin: 0;
-  overflow-x: hidden;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-/* Glassmorphism Panels */
+/* Glassmorphism Core Classes */
 .glass-panel {
   background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-panel);
   box-shadow: var(--shadow-panel);
+  border-radius: 0.75rem;
 }
 
 .glass-panel-interactive {
   background: var(--bg-card);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-panel);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 0.75rem;
 }
 
 .glass-panel-interactive:hover {
   background: var(--bg-card-hover);
-  border-color: rgba(6, 182, 212, 0.4);
-  box-shadow: 0 10px 30px -10px rgba(6, 182, 212, 0.15);
+  border-color: var(--border-panel-hover);
+  box-shadow: 0 10px 30px -10px rgba(0, 240, 255, 0.15);
   transform: translateY(-2px);
 }
 
@@ -71,234 +64,43 @@ body {
   background: var(--input-bg);
   border: 1px solid var(--input-border);
   color: var(--text-primary);
-  transition: all 0.2s ease;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease-in-out;
 }
 
 .glass-input:focus {
   outline: none;
-  border-color: #0284c7;
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 1px rgba(0, 240, 255, 0.3);
 }
 
-/* Harmonious Light Theme Overrides */
-body.theme-light .glass-panel {
-  background-color: #ffffff;
-  border-color: #e2e8f0;
-  color: #0f172a;
+/* Animations */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-body.theme-light h1,
-body.theme-light h2,
-body.theme-light h3,
-body.theme-light h4,
-body.theme-light h5,
-body.theme-light h6 {
-  color: #0f172a;
+.animate-slide-in {
+  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-body.theme-light .text-gray-300,
-body.theme-light .text-gray-400,
-body.theme-light .text-slate-300,
-body.theme-light .text-slate-400 {
-  color: #475569;
-}
-
-/* Buttons in Light Mode */
-body.theme-light button {
-  color: inherit;
-}
-
-/* Gradient Action Buttons (Always White Text) */
-body.theme-light .bg-gradient-to-r {
-  color: #ffffff !important;
-}
-
-body.theme-light .bg-gradient-to-r span,
-body.theme-light .bg-gradient-to-r svg,
-body.theme-light .bg-gradient-to-r p,
-body.theme-light .bg-gradient-to-r h1,
-body.theme-light .bg-gradient-to-r h2,
-body.theme-light .bg-gradient-to-r h3 {
-  color: #ffffff !important;
-}
-
-/* Secondary Ghost Buttons & Controls in Light Mode */
-body.theme-light button.bg-white\/5,
-body.theme-light button.bg-white\/10,
-body.theme-light .bg-white\/5,
-body.theme-light .bg-white\/10 {
-  background-color: #f1f5f9;
-  color: #1e293b;
-  border-color: #cbd5e1;
-}
-
-body.theme-light button.bg-white\/5:hover,
-body.theme-light button.bg-white\/10:hover {
-  background-color: #e2e8f0;
-  color: #0f172a;
-}
-
-/* Sidebar Text in Light Mode */
-body.theme-light aside button.text-gray-300,
-body.theme-light aside button.text-gray-400 {
-  color: #334155;
-}
-
-body.theme-light aside button.text-gray-300:hover,
-body.theme-light aside button.text-gray-400:hover {
-  background-color: #f1f5f9;
-  color: #0f172a;
-}
-
-/* Inputs & Selects in Light Mode */
-body.theme-light input,
-body.theme-light select,
-body.theme-light textarea {
-  background-color: #ffffff;
-  color: #0f172a;
-  border-color: #cbd5e1;
-}
-
-body.theme-light input::placeholder {
-  color: #94a3b8;
-}
-
-body.theme-light select option {
-  background-color: #ffffff;
-  color: #0f172a;
-}
-
-/* High Contrast Accent Colors for Light Mode */
-body.theme-light .text-indigo-400,
-body.theme-light .text-indigo-300 {
-  color: #4f46e5;
-}
-
-body.theme-light .text-cyan-300,
-body.theme-light .text-cyan-400 {
-  color: #0284c7;
-}
-
-body.theme-light .text-emerald-400,
-body.theme-light .text-emerald-300 {
-  color: #059669;
-}
-
-body.theme-light .text-rose-400,
-body.theme-light .text-rose-300 {
-  color: #e11d48;
-}
-
-body.theme-light .text-amber-400,
-body.theme-light .text-amber-300 {
-  color: #d97706;
-}
-
-body.theme-light .text-purple-400,
-body.theme-light .text-purple-300 {
-  color: #9333ea;
-}
-
-/* Soft Badges in Light Mode */
-body.theme-light .bg-cyan-500\/10,
-body.theme-light .bg-cyan-500\/20 {
-  background-color: #f0f9ff;
-  border-color: #bae6fd;
-  color: #0369a1;
-}
-
-body.theme-light .bg-emerald-500\/10,
-body.theme-light .bg-emerald-500\/20 {
-  background-color: #ecfdf5;
-  border-color: #a7f3d0;
-  color: #047857;
-}
-
-body.theme-light .bg-rose-500\/10,
-body.theme-light .bg-rose-500\/20 {
-  background-color: #fff1f2;
-  border-color: #fecdd3;
-  color: #be123c;
-}
-
-body.theme-light .bg-amber-500\/10,
-body.theme-light .bg-amber-500\/20 {
-  background-color: #fffbeb;
-  border-color: #fde68a;
-  color: #b45309;
-}
-
-body.theme-light .bg-purple-500\/10,
-body.theme-light .bg-purple-500\/20 {
-  background-color: #faf5ff;
-  border-color: #e9d5ff;
-  color: #7e22ce;
-}
-
-body.theme-light .bg-black\/30,
-body.theme-light .bg-black\/40,
-body.theme-light .bg-black\/70 {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
-}
-
-/* Custom scrollbars */
-::-webkit-scrollbar {
+/* Scrollbar customization for dark theme */
+.custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-main);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(150, 150, 150, 0.25);
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.2);
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(150, 150, 150, 0.4);
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
 }
 
-/* Glow effects */
-.glow-emerald {
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
-.glow-rose {
-  box-shadow: 0 0 20px rgba(244, 63, 94, 0.25);
-}
-
-.glow-cyan {
-  box-shadow: 0 0 20px rgba(6, 182, 212, 0.25);
-}
-
-/* Force numeric font where needed */
-.font-mono-numbers {
-  font-family: 'Inter', system-ui, monospace;
-}
-
-/* --- Price Flash Animations --- */
-@keyframes flashGreen {
-  0% { color: #34d399; text-shadow: 0 0 12px rgba(52, 211, 153, 0.8); transform: scale(1.05); }
-  100% { color: inherit; text-shadow: none; transform: scale(1); }
-}
-
-@keyframes flashRed {
-  0% { color: #fb7185; text-shadow: 0 0 12px rgba(251, 113, 133, 0.8); transform: scale(0.95); }
-  100% { color: inherit; text-shadow: none; transform: scale(1); }
-}
-
-.flash-green {
-  animation: flashGreen 1s ease-out forwards;
-  display: inline-block;
-  will-change: transform, color, text-shadow;
-}
-
-.flash-red {
-  animation: flashRed 1s ease-out forwards;
-  display: inline-block;
-  will-change: transform, color, text-shadow;
-}
