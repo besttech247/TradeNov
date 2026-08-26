@@ -5,16 +5,7 @@ import TADashboard from './pages/ta/Dashboard';
 import ApiHub from './pages/dev/ApiHub';
 
 import ProApp from './pages/pro/ProApp';
-
-const AgentApp = () => (
-  <div className="px-8 pb-8">
-    <TopNav title="TradeNov AGENT" />
-    <div className="p-8 glass-panel text-center">
-      <h1 className="text-3xl font-bold text-accent">🤖 TradeNov AGENT</h1>
-      <p className="text-text-muted mt-2">Agent AGENT will build the Smart Assistant and Bots here.</p>
-    </div>
-  </div>
-);
+import AgentApp from './pages/agent/AgentApp';
 
 const Hub = () => (
   <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center relative overflow-hidden">
