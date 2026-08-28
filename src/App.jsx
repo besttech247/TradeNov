@@ -6,6 +6,7 @@ import ApiHub from './pages/dev/ApiHub';
 
 import ProApp from './pages/pro/ProApp';
 import AgentApp from './pages/agent/AgentApp';
+import TradeNovScanner from './pages/scanner/TradeNovScanner';
 
 const Hub = () => (
   <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-8 text-center relative overflow-hidden bg-background">
@@ -80,14 +81,19 @@ const Hub = () => (
         </div>
       </Link>
 
-      {/* 2. New Option 1 (Placeholder) */}
-      <Link to="#" className="glass-panel p-4 hover:border-purple-500/40 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 opacity-80 hover:opacity-100">
-        <div className="text-right flex-1">
-          <h2 className="text-sm font-bold text-white">خيار جديد 1</h2>
-          <p className="text-[10px] text-text-muted">مساحة للإضافة مستقبلاً</p>
+      {/* 2. TradeNov Scanner (Beta) */}
+      <Link to="/scanner" className="glass-panel p-4 hover:border-primary/60 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 relative overflow-hidden">
+        <div className="absolute top-1 left-2">
+          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
+            BETA
+          </span>
         </div>
-        <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
-          <span className="text-xl">⚙️</span>
+        <div className="text-right flex-1">
+          <h2 className="text-sm font-bold text-white group-hover:text-primary transition-colors">TradeNov Scanner</h2>
+          <p className="text-[10px] text-text-muted">ماسح الكريبتو اللحظي والسيولة</p>
+        </div>
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(0,240,255,0.2)]">
+          <span className="text-xl">🛰️</span>
         </div>
       </Link>
 
@@ -118,6 +124,7 @@ export default function App() {
         } />
         <Route path="/pro/*" element={<ProApp />} />
         <Route path="/agent/*" element={<AgentApp />} />
+        <Route path="/scanner/*" element={<TradeNovScanner />} />
         <Route path="/dev/api-hub" element={<ApiHub />} />
       </Routes>
     </BrowserRouter>

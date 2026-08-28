@@ -1,0 +1,69 @@
+/* TradeNov Scanner Premium Vanilla CSS Styling */
+
+.tradenov-scanner-container {
+  min-height: 100vh;
+  position: relative;
+  background-color: var(--color-background, #080b11);
+  color: var(--color-text-main, #f3f4f6);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Glassmorphism Panel */
+.scanner-glass {
+  background: rgba(14, 19, 31, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.25rem;
+}
+
+/* Glowing text and borders */
+.scanner-glow-cyan {
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+}
+
+.scanner-glow-emerald {
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.2);
+}
+
+.scanner-glow-rose {
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.2);
+}
+
+/* Dynamic Live Ticker Flash */
+@keyframes price-flash-green {
+  0% { background-color: rgba(52, 211, 153, 0.25); }
+  100% { background-color: transparent; }
+}
+
+@keyframes price-flash-red {
+  0% { background-color: rgba(248, 113, 113, 0.25); }
+  100% { background-color: transparent; }
+}
+
+.flash-up {
+  animation: price-flash-green 1s ease-out;
+}
+
+.flash-down {
+  animation: price-flash-red 1s ease-out;
+}
+
+/* Subtle custom scrollbar */
+.tradenov-scanner-container ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.tradenov-scanner-container ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tradenov-scanner-container ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.tradenov-scanner-container ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.4);
+}
