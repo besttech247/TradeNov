@@ -1,9 +1,16 @@
 // TradeNov Scanner Constants & Default Configurations
 
 export const MARKET_TYPES = {
-  SPOT: 'SPOT',
-  FUTURES: 'FUTURES'
+  ALL: 'ALL',
+  FUTURES: 'FUTURES',
+  SPOT: 'SPOT'
 };
+
+export const PLATFORMS = [
+  { id: 'BINANCE', label: 'Binance', icon: '🟡', type: 'CEX' },
+  { id: 'BYBIT', label: 'Bybit', icon: '🟠', type: 'CEX' },
+  { id: 'DEX', label: 'DEX (Raydium/Uniswap)', icon: '🦄', type: 'DEX' }
+];
 
 export const TIMEFRAMES = [
   { label: '1m', value: '1m', seconds: 60 },
@@ -23,12 +30,15 @@ export const FILTER_PRESETS = [
 ];
 
 export const DEFAULT_SETTINGS = {
-  marketType: MARKET_TYPES.FUTURES,
+  marketType: MARKET_TYPES.ALL,
   timeframe: '5m',
   activeFilter: 'all',
   soundEnabled: true,
-  minVolume24h: 1000000, // $1M minimum 24h volume
-  autoRefreshInterval: 3000, // WebSocket + REST throttle
+  isPaused: false,
+  showHeatmap: true,
+  enabledPlatforms: ['BINANCE', 'BYBIT', 'DEX'],
+  minVolume24h: 500000,
+  autoRefreshInterval: 3000,
   searchQuery: '',
   sortBy: 'quoteVolume',
   sortDirection: 'desc'

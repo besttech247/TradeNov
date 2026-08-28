@@ -23,11 +23,15 @@
 }
 
 .scanner-glow-emerald {
-  box-shadow: 0 0 20px rgba(52, 211, 153, 0.2);
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.25);
 }
 
-.scanner-glow-rose {
-  box-shadow: 0 0 20px rgba(248, 113, 113, 0.2);
+.scanner-glow-purple {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.25);
+}
+
+.scanner-glow-amber {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.25);
 }
 
 /* Dynamic Live Ticker Flash */

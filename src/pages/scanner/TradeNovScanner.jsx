@@ -2,9 +2,11 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { TopNav } from '../../shared/components/TopNav';
 import { ScannerHeader } from './components/ScannerHeader';
 import { ScannerStatsBar } from './components/ScannerStatsBar';
+import { MomentumCardsGrid } from './components/MomentumCardsGrid';
 import { LiveScannerTable } from './components/LiveScannerTable';
 import { QuickMiniChartModal } from './components/QuickMiniChartModal';
-import { useBinanceScanner } from './hooks/useBinanceScanner';
+import { PlatformsFilterModal } from './components/PlatformsFilterModal';
+import { useMultiExchangeScanner } from './hooks/useMultiExchangeScanner';
 import { useAudioAlert } from './hooks/useAudioAlert';
 import { MARKET_TYPES, DEFAULT_SETTINGS } from './utils/scannerConstants';
 import { calculateBtcRelativeStrength } from './utils/technicalIndicators';
@@ -16,17 +18,29 @@ export default function TradeNovScanner() {
   const [activeFilter, setActiveFilter] = useState(DEFAULT_SETTINGS.activeFilter);
   const [searchQuery, setSearchQuery] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(DEFAULT_SETTINGS.soundEnabled);
+  const [isPaused, setIsPaused] = useState(false);
+  const [enabledPlatforms, setEnabledPlatforms] = useState(DEFAULT_SETTINGS.enabledPlatforms);
+  const [minVolume, setMinVolume] = useState(DEFAULT_SETTINGS.minVolume24h);
+  const [isPlatformsModalOpen, setIsPlatformsModalOpen] = useState(false);
   const [selectedCoin, setSelectedCoin] = useState(null);
 
-  const { data, btcData, loading, error, connectionStatus, refresh } = useBinanceScanner(marketType);
+  const {
+    data,
+    btcData,
+    loading,
+    error,
+    connectionStatus,
+    nextRefreshCountdown,
+    refresh
+  } = useMultiExchangeScanner(marketType, enabledPlatforms, isPaused);
+
   const { playAlert } = useAudioAlert();
 
   // تتبع الصفقات لإطلاق التنبيهات الصوتية عند الصعود السريع
   const prevTopGainerRef = useRef(null);
 
   useEffect(() => {
-    if (!soundEnabled || data.length === 0) return;
-    // التحقق من وجود ارتفاع حاد مفاجئ لأحد العملات
+    if (!soundEnabled || isPaused || data.length === 0) return;
     const topCoin = [...data].sort((a, b) => b.priceChangePercent - a.priceChangePercent)[0];
     if (topCoin && prevTopGainerRef.current && topCoin.symbol !== prevTopGainerRef.current.symbol) {
       if (topCoin.priceChangePercent > 10) {
@@ -34,27 +48,30 @@ export default function TradeNovScanner() {
       }
     }
     prevTopGainerRef.current = topCoin;
-  }, [data, soundEnabled, playAlert]);
+  }, [data, soundEnabled, isPaused, playAlert]);
 
   // تطبيق التصفية والبحث
   const filteredData = useMemo(() => {
     let result = data;
 
-    // 1. تصفية البحث بالاسم أو الرمز
+    // 1. تصفية الحد الأدنى للسيولة
+    result = result.filter(c => (c.quoteVolume || 0) >= minVolume);
+
+    // 2. تصفية البحث بالاسم أو الرمز
     if (searchQuery.trim()) {
       const q = searchQuery.toUpperCase().trim();
       result = result.filter(
-        (c) => c.symbol.includes(q) || c.baseAsset.includes(q)
+        (c) => c.symbol.toUpperCase().includes(q) || c.baseAsset.toUpperCase().includes(q)
       );
     }
 
-    // 2. تصفية حسب الفلاتر السريعة
+    // 3. تصفية حسب الفلاتر السريعة
     if (activeFilter === 'volume_surge') {
-      result = result.filter((c) => c.quoteVolume > 40000000 && Math.abs(c.priceChangePercent) > 4);
+      result = result.filter((c) => c.quoteVolume > 30000000 && Math.abs(c.priceChangePercent) > 3.5);
     } else if (activeFilter === 'top_gainers') {
-      result = [...result].sort((a, b) => b.priceChangePercent - a.priceChangePercent).slice(0, 30);
+      result = [...result].sort((a, b) => b.priceChangePercent - a.priceChangePercent).slice(0, 40);
     } else if (activeFilter === 'top_losers') {
-      result = [...result].sort((a, b) => a.priceChangePercent - b.priceChangePercent).slice(0, 30);
+      result = [...result].sort((a, b) => a.priceChangePercent - b.priceChangePercent).slice(0, 40);
     } else if (activeFilter === 'funding_negative') {
       result = result.filter((c) => (c.fundingRate || 0) < -0.0001);
     } else if (activeFilter === 'alpha_btc') {
@@ -65,12 +82,12 @@ export default function TradeNovScanner() {
     }
 
     return result;
-  }, [data, searchQuery, activeFilter, btcData]);
+  }, [data, searchQuery, activeFilter, minVolume, btcData]);
 
   return (
     <div className="tradenov-scanner-container px-4 sm:px-8 pb-12">
       {/* Dynamic Top Navigation with Build Date */}
-      <TopNav title="TradeNov Scanner (Beta)" />
+      <TopNav title="TradeNov Scanner (Beta v1.5)" />
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto">
@@ -82,17 +99,18 @@ export default function TradeNovScanner() {
                 <span>🛰️</span>
                 <span>TradeNov <span className="text-primary glow-text">Scanner</span></span>
               </h2>
-              <span className="text-[10px] font-mono font-bold bg-primary/20 text-primary border border-primary/40 px-2 py-0.5 rounded-full animate-pulse">
-                BETA v1.0
+              <span className="text-[10px] font-mono font-bold bg-primary/20 text-primary border border-primary/40 px-2.5 py-0.5 rounded-full animate-pulse">
+                PRO BETA v1.5
               </span>
             </div>
             <p className="text-xs sm:text-sm text-text-muted mt-1">
-              ماسح السيولة والزخم اللحظي للسوق الفوري والعقود الآجلة - بث مباشر 60FPS عبر بينانس.
+              رادار السيولة المجمعة متعدد المنصات (Binance, Bybit, DEX) للسوق الفوري والعقود الآجلة.
             </p>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-mono text-text-muted bg-white/[0.02] p-2 px-3 rounded-xl border border-white/5">
-            <span>⏱️ التحديث: بث حي مستمر</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>بث حي متعدد المصادر (CEX & DEX)</span>
           </div>
         </div>
 
@@ -108,6 +126,9 @@ export default function TradeNovScanner() {
           setSearchQuery={setSearchQuery}
           soundEnabled={soundEnabled}
           setSoundEnabled={setSoundEnabled}
+          isPaused={isPaused}
+          setIsPaused={setIsPaused}
+          onOpenPlatformsModal={() => setIsPlatformsModalOpen(true)}
           connectionStatus={connectionStatus}
           onRefresh={refresh}
           loading={loading}
@@ -121,6 +142,15 @@ export default function TradeNovScanner() {
           </div>
         )}
 
+        {/* Collapsible Smart Momentum Grid */}
+        <MomentumCardsGrid
+          items={filteredData}
+          btcData={btcData}
+          countdown={nextRefreshCountdown}
+          isPaused={isPaused}
+          onSelectCoin={(coin) => setSelectedCoin(coin)}
+        />
+
         {/* Summary Stats Bar */}
         <ScannerStatsBar
           items={data}
@@ -133,6 +163,7 @@ export default function TradeNovScanner() {
           items={filteredData}
           btcData={btcData}
           marketType={marketType}
+          isPaused={isPaused}
           onSelectCoin={(coin) => setSelectedCoin(coin)}
           loading={loading}
         />
@@ -141,10 +172,20 @@ export default function TradeNovScanner() {
         {selectedCoin && (
           <QuickMiniChartModal
             coin={selectedCoin}
-            marketType={marketType}
+            marketType={selectedCoin.market}
             onClose={() => setSelectedCoin(null)}
           />
         )}
+
+        {/* Platforms & Volume Customization Modal */}
+        <PlatformsFilterModal
+          enabledPlatforms={enabledPlatforms}
+          setEnabledPlatforms={setEnabledPlatforms}
+          minVolume={minVolume}
+          setMinVolume={setMinVolume}
+          isOpen={isPlatformsModalOpen}
+          onClose={() => setIsPlatformsModalOpen(false)}
+        />
       </div>
     </div>
   );

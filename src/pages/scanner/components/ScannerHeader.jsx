@@ -12,38 +12,54 @@ export const ScannerHeader = ({
   setSearchQuery,
   soundEnabled,
   setSoundEnabled,
+  isPaused,
+  setIsPaused,
+  onOpenPlatformsModal,
   connectionStatus,
   onRefresh,
   loading
 }) => {
   return (
     <div className="flex flex-col gap-4 mb-6">
-      {/* Top Row: Market Mode, Search, Sound, Connection Status */}
+      {/* Top Row: Market Mode (ALL / FUTURES / SPOT), Search, Pause/Resume, Sound, Settings */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
         
-        {/* Left / Start: Market Type Toggle (Spot vs Futures) */}
-        <div className="flex items-center gap-2 bg-black/40 p-1 rounded-xl border border-white/10">
+        {/* Left / Start: 3-Way Market Selector */}
+        <div className="flex items-center gap-1.5 bg-black/50 p-1.5 rounded-xl border border-white/10">
+          <button
+            onClick={() => setMarketType(MARKET_TYPES.ALL)}
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 ${
+              marketType === MARKET_TYPES.ALL
+                ? 'bg-primary text-black shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                : 'text-text-muted hover:text-white'
+            }`}
+          >
+            <span>🌐</span>
+            <span>الكل (ALL)</span>
+          </button>
+
           <button
             onClick={() => setMarketType(MARKET_TYPES.FUTURES)}
-            className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 ${
               marketType === MARKET_TYPES.FUTURES
-                ? 'bg-primary text-black shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                ? 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]'
                 : 'text-text-muted hover:text-white'
             }`}
           >
             <span>⚡</span>
-            <span>العقود الآجلة (Futures)</span>
+            <span>العقود (Futures)</span>
           </button>
+
           <button
             onClick={() => setMarketType(MARKET_TYPES.SPOT)}
-            className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 ${
               marketType === MARKET_TYPES.SPOT
-                ? 'bg-primary text-black shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(251,191,36,0.4)]'
                 : 'text-text-muted hover:text-white'
             }`}
           >
             <span>🪙</span>
-            <span>السوق الفوري (Spot)</span>
+            <span>الفوري (Spot)</span>
           </button>
         </div>
 
@@ -53,7 +69,7 @@ export const ScannerHeader = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ابحث عن عملة (مثل BTC, SOL, ETH)..."
+            placeholder="ابحث بالرمز أو العملة (BTC, SOL, PEPE)..."
             className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-text-muted/60 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all text-right"
           />
           {searchQuery && (
@@ -66,12 +82,36 @@ export const ScannerHeader = ({
           )}
         </div>
 
-        {/* Right: Quick Action Controls */}
-        <div className="flex items-center gap-3">
+        {/* Right: Pause Button, Sound, Platforms Filter, Connection, Refresh */}
+        <div className="flex items-center gap-2.5">
+          {/* Pause / Resume Button */}
+          <button
+            onClick={() => setIsPaused(!isPaused)}
+            className={`px-3.5 py-2 rounded-xl border font-bold text-xs transition-all flex items-center gap-1.5 ${
+              isPaused
+                ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)] animate-pulse'
+                : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+            }`}
+            title={isPaused ? 'اضغط لاستئناف التحديث اللحظي' : 'اضغط لإيقاف وتجميد التحديث مؤقتاً أثناء الفحص'}
+          >
+            <span>{isPaused ? '▶️' : '⏸️'}</span>
+            <span>{isPaused ? 'استئناف' : 'تجميد'}</span>
+          </button>
+
+          {/* Platforms Filter Toggle */}
+          <button
+            onClick={onOpenPlatformsModal}
+            className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white transition-all text-xs font-semibold flex items-center gap-1.5"
+            title="تخصيص المنصات (Binance / Bybit / DEX)"
+          >
+            <span>⚙️</span>
+            <span className="hidden sm:inline">المنصات</span>
+          </button>
+
           {/* Sound Toggle */}
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`p-2.5 rounded-xl border transition-all flex items-center gap-2 text-xs font-semibold ${
+            className={`p-2 rounded-xl border transition-all flex items-center gap-1.5 text-xs font-semibold ${
               soundEnabled
                 ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
                 : 'bg-white/5 border-white/10 text-text-muted hover:text-white'
@@ -79,36 +119,21 @@ export const ScannerHeader = ({
             title={soundEnabled ? 'التنبيهات الصوتية مفعلة' : 'التنبيهات الصوتية معطلة'}
           >
             <span>{soundEnabled ? '🔔' : '🔕'}</span>
-            <span className="hidden sm:inline">{soundEnabled ? 'تنبيه نشط' : 'صامت'}</span>
           </button>
-
-          {/* Connection Status Pill */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs font-mono">
-            <span
-              className={`w-2.5 h-2.5 rounded-full animate-pulse ${
-                connectionStatus === 'live'
-                  ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
-                  : 'bg-amber-400 shadow-[0_0_8px_#fbbf24]'
-              }`}
-            ></span>
-            <span className="text-text-muted">
-              {connectionStatus === 'live' ? 'WebSocket حي' : 'جاري الاتصال...'}
-            </span>
-          </div>
 
           {/* Refresh Button */}
           <button
             onClick={onRefresh}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white transition-all disabled:opacity-50"
-            title="تحديث البيانات"
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white transition-all disabled:opacity-50"
+            title="تحديث البيانات فوراً"
           >
             <span className={loading ? 'inline-block animate-spin' : ''}>🔄</span>
           </button>
         </div>
       </div>
 
-      {/* Bottom Row: Timeframes & Filter Presets */}
+      {/* Bottom Row: Filter Presets & Timeframes */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-2">
         {/* Filter Presets */}
         <div className="flex flex-wrap items-center gap-2">

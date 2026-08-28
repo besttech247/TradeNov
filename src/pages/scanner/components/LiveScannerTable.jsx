@@ -7,12 +7,14 @@ import {
   detectScalpSignal,
   calculateBtcRelativeStrength
 } from '../utils/technicalIndicators';
+import { PlatformBadge } from '../utils/platformLogos';
 import { MARKET_TYPES } from '../utils/scannerConstants';
 
 export const LiveScannerTable = ({
   items,
   btcData,
   marketType,
+  isPaused,
   onSelectCoin,
   loading
 }) => {
@@ -28,7 +30,6 @@ export const LiveScannerTable = ({
     }
   };
 
-  // فرز العناصر
   const sortedItems = [...items].sort((a, b) => {
     let aVal = a[sortField];
     let bVal = b[sortField];
@@ -49,7 +50,7 @@ export const LiveScannerTable = ({
     return (
       <div className="flex flex-col items-center justify-center p-16 bg-white/[0.02] border border-white/5 rounded-2xl">
         <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
-        <p className="text-text-muted text-sm font-mono">جاري الاتصال بأسواق بينانس ومسح السيولة الحية...</p>
+        <p className="text-text-muted text-sm font-mono">جاري فحص السيولة من المنصات المتعددة (CEX & DEX)...</p>
       </div>
     );
   }
@@ -57,18 +58,28 @@ export const LiveScannerTable = ({
   if (items.length === 0) {
     return (
       <div className="text-center p-12 bg-white/[0.02] border border-white/5 rounded-2xl">
-        <p className="text-text-muted text-sm">لا توجد عملات تطابق معايير الفلترة الحالية.</p>
+        <p className="text-text-muted text-sm">لا توجد عملات تطابق شروط الفلترة المحددة.</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md shadow-2xl">
+    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md shadow-2xl relative">
+      {/* Visual Watermark if Paused */}
+      {isPaused && (
+        <div className="sticky top-0 z-20 bg-amber-500/10 border-b border-amber-500/30 px-4 py-1.5 text-center text-xs font-mono text-amber-300 backdrop-blur-md">
+          ⏸️ السكانر متوقف مؤقتاً (Frozen) - يمكنك الفحص والضغط على الصفقات بحرية
+        </div>
+      )}
+
       <table className="w-full text-right border-collapse text-xs sm:text-sm">
         <thead>
           <tr className="border-b border-white/10 bg-white/[0.03] text-text-muted text-[11px] font-mono">
             <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('symbol')}>
-              الزوج / العملة {sortField === 'symbol' && (sortAsc ? '▲' : '▼')}
+              الزوج / المنصة {sortField === 'symbol' && (sortAsc ? '▲' : '▼')}
+            </th>
+            <th className="p-3.5 text-center cursor-pointer hover:text-white" onClick={() => handleSort('market')}>
+              النوع (Market) {sortField === 'market' && (sortAsc ? '▲' : '▼')}
             </th>
             <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('price')}>
               السعر اللحظي {sortField === 'price' && (sortAsc ? '▲' : '▼')}
@@ -79,11 +90,9 @@ export const LiveScannerTable = ({
             <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('quoteVolume')}>
               السيولة / الفوليوم {sortField === 'quoteVolume' && (sortAsc ? '▲' : '▼')}
             </th>
-            {marketType === MARKET_TYPES.FUTURES && (
-              <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('fundingRate')}>
-                معدل التمويل (Funding) {sortField === 'fundingRate' && (sortAsc ? '▲' : '▼')}
-              </th>
-            )}
+            <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('fundingRate')}>
+              التمويل (Funding) {sortField === 'fundingRate' && (sortAsc ? '▲' : '▼')}
+            </th>
             <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('alpha')}>
               الألفا vs BTC {sortField === 'alpha' && (sortAsc ? '▲' : '▼')}
             </th>
@@ -98,17 +107,21 @@ export const LiveScannerTable = ({
             const alphaVsBtc = calculateBtcRelativeStrength(item.priceChangePercent, btcChange);
             const signals = detectScalpSignal(item, btcChange);
 
-            // حساب النطاق السعري بين الأدنى والأعلى خلال 24h
-            const range = item.highPrice - item.lowPrice;
-            const currentPosition = range > 0 ? Math.min(100, Math.max(0, ((item.price - item.lowPrice) / range) * 100)) : 50;
+            // رابط التداول حسب المنصة
+            const tradeUrl =
+              item.platform === 'BYBIT'
+                ? `https://www.bybit.com/trade/usdt/${item.symbol}`
+                : item.platform === 'DEX'
+                ? item.dexUrl || `https://dexscreener.com/search?q=${item.baseAsset}`
+                : `https://www.binance.com/ar/${item.market === 'FUTURES' ? 'futures' : 'trade'}/${item.baseAsset}_USDT`;
 
             return (
               <tr
-                key={item.symbol}
+                key={item.id}
                 className="hover:bg-white/[0.04] transition-colors group cursor-pointer"
                 onClick={() => onSelectCoin(item)}
               >
-                {/* 1. Symbol & Market */}
+                {/* 1. Symbol & Platform */}
                 <td className="p-3.5 text-right">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold text-xs text-white group-hover:border-primary/50 transition-colors">
@@ -119,22 +132,31 @@ export const LiveScannerTable = ({
                         <span>{item.baseAsset}</span>
                         <span className="text-[10px] text-text-muted font-normal">/ {item.quoteAsset}</span>
                       </div>
-                      <span className="text-[10px] text-primary/80 font-mono">
-                        {item.market}
-                      </span>
+                      <div className="mt-0.5">
+                        <PlatformBadge platformId={item.platform} />
+                      </div>
                     </div>
                   </div>
                 </td>
 
-                {/* 2. Live Price */}
+                {/* 2. Market Type Badge (Spot vs Futures with distinctive color) */}
+                <td className="p-3.5 text-center">
+                  {item.market === 'FUTURES' ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                      <span>⚡</span>
+                      <span>FUTURES</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                      <span>🪙</span>
+                      <span>SPOT</span>
+                    </span>
+                  )}
+                </td>
+
+                {/* 3. Live Price */}
                 <td className="p-3.5 text-right">
-                  <div className={`font-bold text-sm transition-all duration-300 ${
-                    item.priceDirection === 'up'
-                      ? 'text-emerald-400 scale-105'
-                      : item.priceDirection === 'down'
-                      ? 'text-rose-400 scale-105'
-                      : 'text-white'
-                  }`}>
+                  <div className="font-bold text-sm text-white">
                     ${formatPrice(item.price)}
                   </div>
                   <div className="text-[10px] text-text-muted">
@@ -142,7 +164,7 @@ export const LiveScannerTable = ({
                   </div>
                 </td>
 
-                {/* 3. 24h Change */}
+                {/* 4. 24h Change */}
                 <td className="p-3.5 text-right">
                   <span
                     className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold ${
@@ -153,16 +175,9 @@ export const LiveScannerTable = ({
                   >
                     {formatPercent(item.priceChangePercent)}
                   </span>
-                  {/* شريط النطاق السعري 24h */}
-                  <div className="w-20 bg-white/10 h-1 rounded-full mt-1.5 overflow-hidden">
-                    <div
-                      className={`h-full ${isPositive ? 'bg-emerald-400' : 'bg-rose-400'}`}
-                      style={{ width: `${currentPosition}%` }}
-                    ></div>
-                  </div>
                 </td>
 
-                {/* 4. Volume */}
+                {/* 5. Volume */}
                 <td className="p-3.5 text-right font-bold text-text-main">
                   <div>{formatVolume(item.quoteVolume)}</div>
                   <div className="text-[10px] text-text-muted font-normal">
@@ -170,9 +185,9 @@ export const LiveScannerTable = ({
                   </div>
                 </td>
 
-                {/* 5. Funding Rate (Futures only) */}
-                {marketType === MARKET_TYPES.FUTURES && (
-                  <td className="p-3.5 text-right">
+                {/* 6. Funding Rate */}
+                <td className="p-3.5 text-right">
+                  {item.market === 'FUTURES' ? (
                     <div
                       className={`font-bold ${
                         (item.fundingRate || 0) < -0.0003
@@ -184,13 +199,12 @@ export const LiveScannerTable = ({
                     >
                       {formatFundingRate(item.fundingRate)}
                     </div>
-                    {(item.fundingRate || 0) < -0.0003 && (
-                      <span className="text-[9px] text-cyan-400 font-semibold">Short Squeeze ⚠️</span>
-                    )}
-                  </td>
-                )}
+                  ) : (
+                    <span className="text-text-muted/40 text-xs">---</span>
+                  )}
+                </td>
 
-                {/* 6. Alpha vs BTC */}
+                {/* 7. Alpha vs BTC */}
                 <td className="p-3.5 text-right">
                   <span
                     className={`text-xs font-bold ${
@@ -201,7 +215,7 @@ export const LiveScannerTable = ({
                   </span>
                 </td>
 
-                {/* 7. Scalping Signals */}
+                {/* 8. Scalping Signals */}
                 <td className="p-3.5 text-center">
                   <div className="flex flex-wrap items-center justify-center gap-1">
                     {signals.length > 0 ? (
@@ -219,7 +233,7 @@ export const LiveScannerTable = ({
                   </div>
                 </td>
 
-                {/* 8. Actions */}
+                {/* 9. Actions */}
                 <td className="p-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-center gap-2">
                     <button
@@ -230,11 +244,11 @@ export const LiveScannerTable = ({
                       📈 شارت
                     </button>
                     <a
-                      href={`https://www.binance.com/ar/${marketType === MARKET_TYPES.FUTURES ? 'futures' : 'trade'}/${item.baseAsset}_USDT`}
+                      href={tradeUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1 rounded-lg bg-white/5 hover:bg-white/15 text-text-muted hover:text-white transition-all text-xs"
-                      title="فتح على بينانس مباشرة"
+                      title={`فتح على ${item.platform}`}
                     >
                       ↗️
                     </a>
