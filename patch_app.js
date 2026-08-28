@@ -1,4 +1,6 @@
-import React from 'react';
+const fs = require('fs');
+
+const appContent = `import React from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { TopNav } from './shared/components/TopNav';
 import TADashboard from './pages/ta/Dashboard';
@@ -51,54 +53,54 @@ const Hub = () => (
 
     {/* Secondary Menu (API Hub + 3 New Options) */}
     <div className="w-full max-w-5xl text-right mb-6">
-      <h3 className="text-xl font-bold text-white/80 border-b border-white/10 pb-3 flex items-center justify-end gap-2">
+      <h3 className="text-xl font-bold text-white/80 border-b border-white/10 pb-3 flex items-center gap-2">
         <span className="w-2 h-2 rounded-full bg-white/20"></span>
         أدوات النظام المساعدة
       </h3>
     </div>
 
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl w-full">
-      {/* 4. New Option 3 (Placeholder) */}
-      <Link to="#" className="glass-panel p-4 hover:border-rose-500/40 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 opacity-80 hover:opacity-100">
-        <div className="text-right flex-1">
-          <h2 className="text-sm font-bold text-white">خيار جديد 3</h2>
-          <p className="text-[10px] text-text-muted">مساحة للإضافة مستقبلاً</p>
-        </div>
-        <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform">
-          <span className="text-xl">🛡️</span>
-        </div>
-      </Link>
-
-      {/* 3. New Option 2 (Placeholder) */}
-      <Link to="#" className="glass-panel p-4 hover:border-orange-500/40 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 opacity-80 hover:opacity-100">
-        <div className="text-right flex-1">
-          <h2 className="text-sm font-bold text-white">خيار جديد 2</h2>
-          <p className="text-[10px] text-text-muted">مساحة للإضافة مستقبلاً</p>
-        </div>
-        <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
-          <span className="text-xl">📊</span>
-        </div>
-      </Link>
-
-      {/* 2. New Option 1 (Placeholder) */}
-      <Link to="#" className="glass-panel p-4 hover:border-purple-500/40 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 opacity-80 hover:opacity-100">
-        <div className="text-right flex-1">
-          <h2 className="text-sm font-bold text-white">خيار جديد 1</h2>
-          <p className="text-[10px] text-text-muted">مساحة للإضافة مستقبلاً</p>
-        </div>
-        <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
-          <span className="text-xl">⚙️</span>
-        </div>
-      </Link>
-
       {/* 1. API Hub */}
-      <Link to="/dev/api-hub" className="glass-panel p-4 hover:border-white/40 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5">
+      <Link to="/dev/api-hub" className="glass-panel p-4 hover:border-white/40 transition-all cursor-pointer group flex items-center gap-4 bg-white/5">
+        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+          <span className="text-xl">⚡</span>
+        </div>
         <div className="text-right flex-1">
           <h2 className="text-sm font-bold text-white">API Hub</h2>
           <p className="text-[10px] text-text-muted">لوحة مراقبة السيرفرات</p>
         </div>
-        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-          <span className="text-xl">⚡</span>
+      </Link>
+
+      {/* 2. New Option 1 (Placeholder) */}
+      <Link to="#" className="glass-panel p-4 hover:border-purple-500/40 transition-all cursor-pointer group flex items-center gap-4 bg-white/5 opacity-80 hover:opacity-100">
+        <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+          <span className="text-xl">⚙️</span>
+        </div>
+        <div className="text-right flex-1">
+          <h2 className="text-sm font-bold text-white">خيار جديد 1</h2>
+          <p className="text-[10px] text-text-muted">مساحة للإضافة مستقبلاً</p>
+        </div>
+      </Link>
+
+      {/* 3. New Option 2 (Placeholder) */}
+      <Link to="#" className="glass-panel p-4 hover:border-orange-500/40 transition-all cursor-pointer group flex items-center gap-4 bg-white/5 opacity-80 hover:opacity-100">
+        <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
+          <span className="text-xl">📊</span>
+        </div>
+        <div className="text-right flex-1">
+          <h2 className="text-sm font-bold text-white">خيار جديد 2</h2>
+          <p className="text-[10px] text-text-muted">مساحة للإضافة مستقبلاً</p>
+        </div>
+      </Link>
+
+      {/* 4. New Option 3 (Placeholder) */}
+      <Link to="#" className="glass-panel p-4 hover:border-rose-500/40 transition-all cursor-pointer group flex items-center gap-4 bg-white/5 opacity-80 hover:opacity-100">
+        <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform">
+          <span className="text-xl">🛡️</span>
+        </div>
+        <div className="text-right flex-1">
+          <h2 className="text-sm font-bold text-white">خيار جديد 3</h2>
+          <p className="text-[10px] text-text-muted">مساحة للإضافة مستقبلاً</p>
         </div>
       </Link>
     </div>
@@ -123,3 +125,6 @@ export default function App() {
     </BrowserRouter>
   );
 }
+`;
+
+fs.writeFileSync('src/App.jsx', appContent);
