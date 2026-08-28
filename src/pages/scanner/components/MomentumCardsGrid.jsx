@@ -21,16 +21,16 @@ export const MomentumCardsGrid = ({
 
   const btcChange = btcData?.priceChangePercent || 0;
 
-  // اختيار أفضل العملات ذات الزخم الصاعد
+  // اختيار أفضل العملات ذات الزخم الصاعد وترتيبها
   const trendingCoins = [...items]
     .map(coin => ({
       ...coin,
       momentumScore: calculateMomentumScore(coin, btcChange),
       signals: detectScalpSignal(coin, btcChange)
     }))
-    .filter(c => c.priceChangePercent > 2 || c.momentumScore >= 2)
+    .filter(c => c.priceChangePercent > 1 || c.momentumScore >= 1)
     .sort((a, b) => b.momentumScore - a.momentumScore || b.priceChangePercent - a.priceChangePercent)
-    .slice(0, 10);
+    .slice(0, 12);
 
   return (
     <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md overflow-hidden transition-all">
@@ -47,10 +47,10 @@ export const MomentumCardsGrid = ({
           <div>
             <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
               <span>🔥</span>
-              <span>شبكة رادار الزخم وفرص الصعود الذكية (Momentum Grid)</span>
+              <span>رادار بوكسات الزخم وفرص الصعود (Momentum Boxes)</span>
             </h3>
             <p className="text-[11px] text-text-muted">
-              حجم البطاقة يكبر تلقائياً كلما زادت إشارات انفجار السيولة والزخم الصاعد.
+              بوكسات متناسقة الحجم لأقوى العملات صعوداً وسيولة مع رتبة الزخم وتأكيد الصفقات.
             </p>
           </div>
         </div>
@@ -74,50 +74,46 @@ export const MomentumCardsGrid = ({
         </div>
       </div>
 
-      {/* Collapsible Body */}
+      {/* Collapsible Body: Uniform Symmetrical Boxes */}
       {isExpanded && (
         <div className="p-4">
           {trendingCoins.length === 0 ? (
             <div className="text-center py-6 text-xs text-text-muted">
-              لا توجد عملات في حالة انفجار أو زخم صاعد استثنائي حالياً.
+              لا توجد عملات في حالة زخم صاعد حالياً.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 auto-rows-[minmax(110px,auto)]">
-              {trendingCoins.map((coin) => {
-                const isLeader = coin.momentumScore >= 4;
-                const isSecondary = coin.momentumScore === 3;
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {trendingCoins.map((coin, index) => {
+                const isLeader = index === 0;
+                const isTopThree = index < 3;
 
-                // تحجيم ديناميكي للبطاقة:
-                const colSpanClass = isLeader
-                  ? 'sm:col-span-2 md:col-span-2 lg:col-span-2'
-                  : isSecondary
-                  ? 'sm:col-span-2 md:col-span-2 lg:col-span-2'
-                  : 'col-span-1';
-
+                // تصميم بوكس موحد وثابت لجميع البطاقات (Uniform Boxes)
                 const borderStyle = isLeader
-                  ? 'border-emerald-500/50 bg-gradient-to-br from-emerald-950/40 via-black/50 to-black/80 shadow-[0_0_25px_rgba(52,211,153,0.15)] ring-1 ring-emerald-500/40'
-                  : isSecondary
-                  ? 'border-cyan-500/40 bg-gradient-to-br from-cyan-950/30 via-black/40 to-black/70 shadow-[0_0_15px_rgba(0,240,255,0.1)]'
+                  ? 'border-emerald-500/50 bg-gradient-to-b from-emerald-950/30 to-black/60 shadow-[0_0_15px_rgba(52,211,153,0.15)] ring-1 ring-emerald-500/40'
+                  : isTopThree
+                  ? 'border-cyan-500/40 bg-gradient-to-b from-cyan-950/20 to-black/50 shadow-[0_0_10px_rgba(0,240,255,0.1)]'
                   : 'border-white/10 bg-black/40 hover:border-white/20';
 
                 return (
                   <div
                     key={coin.id}
                     onClick={() => onSelectCoin(coin)}
-                    className={`${colSpanClass} ${borderStyle} p-3.5 rounded-2xl border transition-all duration-300 hover:-translate-y-1 cursor-pointer flex flex-col justify-between group relative overflow-hidden`}
+                    className={`${borderStyle} p-3 rounded-2xl border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer flex flex-col justify-between aspect-square min-h-[145px] group relative overflow-hidden`}
                   >
-                    {/* Background subtle glow */}
-                    {isLeader && (
-                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none"></div>
-                    )}
-
-                    {/* Top Row: Symbol, Market Type, Platform Badge */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`font-black tracking-tight ${isLeader ? 'text-base sm:text-lg text-white' : 'text-sm text-white'}`}>
-                          {coin.baseAsset}
-                        </span>
-                        <PlatformBadge platformId={coin.platform} />
+                    {/* Top Row: Symbol, Rank Number & Platform */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1">
+                          <span className="font-black text-sm text-white tracking-tight group-hover:text-primary transition-colors">
+                            {coin.baseAsset}
+                          </span>
+                          <span className="text-[9px] font-mono text-text-muted">
+                            #{index + 1}
+                          </span>
+                        </div>
+                        <div className="mt-1">
+                          <PlatformBadge platformId={coin.platform} />
+                        </div>
                       </div>
 
                       <span
@@ -131,28 +127,24 @@ export const MomentumCardsGrid = ({
                       </span>
                     </div>
 
-                    {/* Middle Row: Price & 24h Change */}
-                    <div className="flex items-baseline justify-between mb-2 font-mono">
-                      <span className={`font-bold text-white ${isLeader ? 'text-sm sm:text-base' : 'text-xs'}`}>
+                    {/* Middle Section: Price & 24h Change */}
+                    <div className="my-1 flex flex-col items-center justify-center text-center font-mono">
+                      <span className="text-xs text-text-muted font-normal">
                         ${formatPrice(coin.price)}
                       </span>
-                      <span className="text-xs font-extrabold text-emerald-400">
+                      <span className="text-sm font-black text-emerald-400 mt-0.5">
                         {formatPercent(coin.priceChangePercent)}
                       </span>
                     </div>
 
-                    {/* Bottom Row: Signals & Volume */}
-                    <div className="flex flex-wrap items-center justify-between gap-1 pt-2 border-t border-white/5 text-[10px] font-mono">
-                      <span className="text-text-muted">
-                        فوليوم: <strong className="text-white">{formatVolume(coin.quoteVolume)}</strong>
+                    {/* Bottom Row: Volume & Primary Signal */}
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
+                      <span className="text-text-muted truncate max-w-[55px]">
+                        {formatVolume(coin.quoteVolume)}
                       </span>
-                      <div className="flex items-center gap-1">
-                        {coin.signals.slice(0, 2).map((sig, idx) => (
-                          <span key={idx} className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-cyan-300">
-                            {sig.label}
-                          </span>
-                        ))}
-                      </div>
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-white/5 text-cyan-300 border border-white/10 truncate max-w-[65px]">
+                        {coin.signals[0]?.label || 'زخم صاعد'}
+                      </span>
                     </div>
                   </div>
                 );
