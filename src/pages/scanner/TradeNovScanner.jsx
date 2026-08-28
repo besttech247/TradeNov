@@ -6,6 +6,7 @@ import { MomentumCardsGrid } from './components/MomentumCardsGrid';
 import { LiveScannerTable } from './components/LiveScannerTable';
 import { QuickMiniChartModal } from './components/QuickMiniChartModal';
 import { PlatformsFilterModal } from './components/PlatformsFilterModal';
+import { IconsLegendDrawer } from './components/IconsLegendDrawer';
 import { useMultiExchangeScanner } from './hooks/useMultiExchangeScanner';
 import { useAudioAlert } from './hooks/useAudioAlert';
 import { MARKET_TYPES, DEFAULT_SETTINGS } from './utils/scannerConstants';
@@ -167,6 +168,9 @@ export default function TradeNovScanner() {
           onSelectCoin={(coin) => setSelectedCoin(coin)}
           loading={loading}
         />
+
+        {/* Collapsible Icons & Signals Legend Drawer */}
+        <IconsLegendDrawer />
 
         {/* Quick Candlestick Mini-Chart Modal */}
         {selectedCoin && (

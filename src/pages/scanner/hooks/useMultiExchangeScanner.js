@@ -43,23 +43,29 @@ export const useMultiExchangeScanner = (
               if (Array.isArray(premiums)) {
                 premiums.forEach(p => fundingMap.set(p.symbol, p.lastFundingRate));
               }
-              return (Array.isArray(tickers) ? tickers : []).filter(t => t.symbol.endsWith('USDT')).map(t => ({
-                id: `BINANCE_${t.symbol}_FUTURES`,
-                symbol: t.symbol,
-                baseAsset: t.symbol.replace('USDT', ''),
-                quoteAsset: 'USDT',
-                price: parseFloat(t.lastPrice),
-                prevPrice: parseFloat(t.lastPrice),
-                priceChangePercent: parseFloat(t.priceChangePercent),
-                highPrice: parseFloat(t.highPrice),
-                lowPrice: parseFloat(t.lowPrice),
-                volume: parseFloat(t.volume),
-                quoteVolume: parseFloat(t.quoteVolume),
-                fundingRate: fundingMap.get(t.symbol) ? parseFloat(fundingMap.get(t.symbol)) : 0,
-                market: 'FUTURES',
-                platform: 'BINANCE',
-                updatedAt: Date.now()
-              }));
+              return (Array.isArray(tickers) ? tickers : []).filter(t => t.symbol.endsWith('USDT')).map(t => {
+                const currentPrice = parseFloat(t.lastPrice);
+                const openPrice = parseFloat(t.openPrice || t.prevClosePrice || t.lastPrice);
+                const sessionChange = openPrice > 0 ? +(((currentPrice - openPrice) / openPrice) * 100).toFixed(2) : parseFloat(t.priceChangePercent);
+                return {
+                  id: `BINANCE_${t.symbol}_FUTURES`,
+                  symbol: t.symbol,
+                  baseAsset: t.symbol.replace('USDT', ''),
+                  quoteAsset: 'USDT',
+                  price: currentPrice,
+                  prevPrice: currentPrice,
+                  openPrice: openPrice,
+                  priceChangePercent: sessionChange,
+                  highPrice: parseFloat(t.highPrice),
+                  lowPrice: parseFloat(t.lowPrice),
+                  volume: parseFloat(t.volume),
+                  quoteVolume: parseFloat(t.quoteVolume),
+                  fundingRate: fundingMap.get(t.symbol) ? parseFloat(fundingMap.get(t.symbol)) : 0,
+                  market: 'FUTURES',
+                  platform: 'BINANCE',
+                  updatedAt: Date.now()
+                };
+              });
             }).catch(() => [])
           );
         }
@@ -68,23 +74,29 @@ export const useMultiExchangeScanner = (
           promises.push(
             fetch(BINANCE_SPOT_URL)
               .then(r => r.ok ? r.json() : [])
-              .then(tickers => (Array.isArray(tickers) ? tickers : []).filter(t => t.symbol.endsWith('USDT')).map(t => ({
-                id: `BINANCE_${t.symbol}_SPOT`,
-                symbol: t.symbol,
-                baseAsset: t.symbol.replace('USDT', ''),
-                quoteAsset: 'USDT',
-                price: parseFloat(t.lastPrice),
-                prevPrice: parseFloat(t.lastPrice),
-                priceChangePercent: parseFloat(t.priceChangePercent),
-                highPrice: parseFloat(t.highPrice),
-                lowPrice: parseFloat(t.lowPrice),
-                volume: parseFloat(t.volume),
-                quoteVolume: parseFloat(t.quoteVolume),
-                fundingRate: null,
-                market: 'SPOT',
-                platform: 'BINANCE',
-                updatedAt: Date.now()
-              }))).catch(() => [])
+              .then(tickers => (Array.isArray(tickers) ? tickers : []).filter(t => t.symbol.endsWith('USDT')).map(t => {
+                const currentPrice = parseFloat(t.lastPrice);
+                const openPrice = parseFloat(t.openPrice || t.prevClosePrice || t.lastPrice);
+                const sessionChange = openPrice > 0 ? +(((currentPrice - openPrice) / openPrice) * 100).toFixed(2) : parseFloat(t.priceChangePercent);
+                return {
+                  id: `BINANCE_${t.symbol}_SPOT`,
+                  symbol: t.symbol,
+                  baseAsset: t.symbol.replace('USDT', ''),
+                  quoteAsset: 'USDT',
+                  price: currentPrice,
+                  prevPrice: currentPrice,
+                  openPrice: openPrice,
+                  priceChangePercent: sessionChange,
+                  highPrice: parseFloat(t.highPrice),
+                  lowPrice: parseFloat(t.lowPrice),
+                  volume: parseFloat(t.volume),
+                  quoteVolume: parseFloat(t.quoteVolume),
+                  fundingRate: null,
+                  market: 'SPOT',
+                  platform: 'BINANCE',
+                  updatedAt: Date.now()
+                };
+              })).catch(() => [])
           );
         }
       }

@@ -37,6 +37,16 @@ export const formatPercent = (percent) => {
 };
 
 /**
+ * حساب التغير من سعر الافتتاح/الإغلاق السابق (Session Close/Open) وليس مجرد 24 ساعة عشوائية
+ */
+export const calculateSessionChange = (currentPrice, openPrice) => {
+  const curr = parseFloat(currentPrice);
+  const open = parseFloat(openPrice);
+  if (!curr || !open || open === 0) return 0;
+  return +(((curr - open) / open) * 100).toFixed(2);
+};
+
+/**
  * تنسيق معدل التمويل (Funding Rate) مع التحويل لنسبة مئوية
  */
 export const formatFundingRate = (rate) => {
@@ -49,14 +59,14 @@ export const formatFundingRate = (rate) => {
 /**
  * حساب قوة العملة أمام البيتكوين (Alpha vs BTC)
  */
-export const calculateBtcRelativeStrength = (coinChange24h, btcChange24h) => {
-  const coin = parseFloat(coinChange24h) || 0;
-  const btc = parseFloat(btcChange24h) || 0;
+export const calculateBtcRelativeStrength = (coinChange, btcChange) => {
+  const coin = parseFloat(coinChange) || 0;
+  const btc = parseFloat(btcChange) || 0;
   return +(coin - btc).toFixed(2);
 };
 
 /**
- * رصد إشارة المضاربة السريعة بناءً على المعايير الفنية
+ * رصد إشارة المضاربة السريعة مع وزن النقطة
  */
 export const detectScalpSignal = (item, btcChange = 0) => {
   const signals = [];
@@ -65,53 +75,42 @@ export const detectScalpSignal = (item, btcChange = 0) => {
   const funding = item.fundingRate ? parseFloat(item.fundingRate) * 100 : 0;
   const alpha = calculateBtcRelativeStrength(change, btcChange);
 
-  // 1. إشارة انفجار الفوليوم
+  // 1. إشارة انفجار الفوليوم (وزن 3)
   if (vol > 40000000 && Math.abs(change) > 4) {
-    signals.push({ type: 'SURGE', label: 'انفجار سيولة 🌊', color: 'text-cyan-400 bg-cyan-950/60 border-cyan-500/30' });
+    signals.push({ type: 'SURGE', weight: 3, label: 'انفجار سيولة 🌊', color: 'text-cyan-400 bg-cyan-950/60 border-cyan-500/30' });
   }
 
-  // 2. إشارة الاختراق السعري الصاعد
+  // 2. إشارة الاختراق السعري الصاعد (وزن 2)
   if (change >= 7) {
-    signals.push({ type: 'PUMP', label: 'زخم صاعد 🚀', color: 'text-emerald-400 bg-emerald-950/60 border-emerald-500/30' });
+    signals.push({ type: 'PUMP', weight: 2, label: 'زخم صاعد 🚀', color: 'text-emerald-400 bg-emerald-950/60 border-emerald-500/30' });
   } else if (change <= -7) {
-    signals.push({ type: 'DUMP', label: 'هبوط حاد 📉', color: 'text-rose-400 bg-rose-950/60 border-rose-500/30' });
+    signals.push({ type: 'DUMP', weight: 1, label: 'هبوط حاد 📉', color: 'text-rose-400 bg-rose-950/60 border-rose-500/30' });
   }
 
-  // 3. إشارة انضغاط الشورت (Short Squeeze Opportunity)
+  // 3. إشارة انضغاط الشورت (وزن 2)
   if (funding <= -0.04) {
-    signals.push({ type: 'SQUEEZE', label: 'ضغط شورت ⚡', color: 'text-amber-400 bg-amber-950/60 border-amber-500/30' });
+    signals.push({ type: 'SQUEEZE', weight: 2, label: 'ضغط شورت ⚡', color: 'text-amber-400 bg-amber-950/60 border-amber-500/30' });
   }
 
-  // 4. تفوق قوي على البيتكوين
+  // 4. تفوق قوي على البيتكوين (وزن 2)
   if (alpha >= 4) {
-    signals.push({ type: 'ALPHA', label: 'ألفا قوية 🎯', color: 'text-purple-400 bg-purple-950/60 border-purple-500/30' });
+    signals.push({ type: 'ALPHA', weight: 2, label: 'ألفا قوية 🎯', color: 'text-purple-400 bg-purple-950/60 border-purple-500/30' });
   }
 
   return signals;
 };
 
 /**
- * حساب درجة الزخم (Momentum Score) لتحديد حجم وبروز البطاقة في شبكة البطاقات
- * كلما زادت إشارات الصعود كانت البطاقة أكبر حجماً وأكثر توهجاً
+ * حساب مجموع وزن الإشارات لترتيب الجدول حسب قوة الإشارة
+ */
+export const getSignalsTotalWeight = (item, btcChange = 0) => {
+  const signals = detectScalpSignal(item, btcChange);
+  return signals.reduce((acc, curr) => acc + (curr.weight || 1), 0);
+};
+
+/**
+ * حساب درجة الزخم (Momentum Score)
  */
 export const calculateMomentumScore = (item, btcChange = 0) => {
-  let score = 0;
-  const change = parseFloat(item.priceChangePercent) || 0;
-  const vol = parseFloat(item.quoteVolume) || 0;
-  const funding = item.fundingRate ? parseFloat(item.fundingRate) * 100 : 0;
-  const alpha = calculateBtcRelativeStrength(change, btcChange);
-
-  if (change > 15) score += 4;
-  else if (change > 7) score += 2;
-  else if (change > 3) score += 1;
-
-  if (vol > 100000000) score += 3;
-  else if (vol > 30000000) score += 2;
-
-  if (alpha > 6) score += 2;
-  else if (alpha > 3) score += 1;
-
-  if (funding <= -0.04) score += 2;
-
-  return score;
+  return getSignalsTotalWeight(item, btcChange);
 };

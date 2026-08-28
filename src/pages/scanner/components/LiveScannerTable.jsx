@@ -5,7 +5,8 @@ import {
   formatVolume,
   formatFundingRate,
   detectScalpSignal,
-  calculateBtcRelativeStrength
+  calculateBtcRelativeStrength,
+  getSignalsTotalWeight
 } from '../utils/technicalIndicators';
 import { PlatformBadge } from '../utils/platformLogos';
 import { MARKET_TYPES } from '../utils/scannerConstants';
@@ -18,8 +19,10 @@ export const LiveScannerTable = ({
   onSelectCoin,
   loading
 }) => {
-  const [sortField, setSortField] = useState('quoteVolume');
+  const [sortField, setSortField] = useState('signals');
   const [sortAsc, setSortAsc] = useState(false);
+
+  const btcChange = btcData?.priceChangePercent || 0;
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -35,9 +38,11 @@ export const LiveScannerTable = ({
     let bVal = b[sortField];
 
     if (sortField === 'alpha') {
-      const btcChange = btcData?.priceChangePercent || 0;
       aVal = calculateBtcRelativeStrength(a.priceChangePercent, btcChange);
       bVal = calculateBtcRelativeStrength(b.priceChangePercent, btcChange);
+    } else if (sortField === 'signals') {
+      aVal = getSignalsTotalWeight(a, btcChange);
+      bVal = getSignalsTotalWeight(b, btcChange);
     }
 
     if (aVal === undefined || aVal === null) return 1;
@@ -74,18 +79,18 @@ export const LiveScannerTable = ({
 
       <table className="w-full text-right border-collapse text-xs sm:text-sm">
         <thead>
-          <tr className="border-b border-white/10 bg-white/[0.03] text-text-muted text-[11px] font-mono">
+          <tr className="border-b border-white/10 bg-white/[0.03] text-text-muted text-[11px] font-mono select-none">
             <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('symbol')}>
               الزوج / المنصة {sortField === 'symbol' && (sortAsc ? '▲' : '▼')}
             </th>
             <th className="p-3.5 text-center cursor-pointer hover:text-white" onClick={() => handleSort('market')}>
-              النوع (Market) {sortField === 'market' && (sortAsc ? '▲' : '▼')}
+              النوع {sortField === 'market' && (sortAsc ? '▲' : '▼')}
             </th>
             <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('price')}>
               السعر اللحظي {sortField === 'price' && (sortAsc ? '▲' : '▼')}
             </th>
             <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('priceChangePercent')}>
-              تغير 24h {sortField === 'priceChangePercent' && (sortAsc ? '▲' : '▼')}
+              تغير الجلسة {sortField === 'priceChangePercent' && (sortAsc ? '▲' : '▼')}
             </th>
             <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('quoteVolume')}>
               السيولة / الفوليوم {sortField === 'quoteVolume' && (sortAsc ? '▲' : '▼')}
@@ -96,18 +101,23 @@ export const LiveScannerTable = ({
             <th className="p-3.5 text-right cursor-pointer hover:text-white" onClick={() => handleSort('alpha')}>
               الألفا vs BTC {sortField === 'alpha' && (sortAsc ? '▲' : '▼')}
             </th>
-            <th className="p-3.5 text-center">إشارات الزخم ⚡</th>
+            {/* فرز مباشر حسب الإشارات */}
+            <th
+              className="p-3.5 text-center cursor-pointer hover:text-white bg-white/[0.02]"
+              onClick={() => handleSort('signals')}
+              title="اضغط هنا لترتيب الجدول حسب العملات التي تملك أقوى وأكثر إشارات صعود"
+            >
+              إشارات الزخم ⚡ {sortField === 'signals' && (sortAsc ? '▲' : '▼')}
+            </th>
             <th className="p-3.5 text-center">إجراءات</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5 font-mono">
           {sortedItems.map((item) => {
             const isPositive = item.priceChangePercent >= 0;
-            const btcChange = btcData?.priceChangePercent || 0;
             const alphaVsBtc = calculateBtcRelativeStrength(item.priceChangePercent, btcChange);
             const signals = detectScalpSignal(item, btcChange);
 
-            // رابط التداول حسب المنصة
             const tradeUrl =
               item.platform === 'BYBIT'
                 ? `https://www.bybit.com/trade/usdt/${item.symbol}`
@@ -121,33 +131,28 @@ export const LiveScannerTable = ({
                 className="hover:bg-white/[0.04] transition-colors group cursor-pointer"
                 onClick={() => onSelectCoin(item)}
               >
-                {/* 1. Symbol & Platform */}
+                {/* 1. Symbol & Exchange Icon Only */}
                 <td className="p-3.5 text-right">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold text-xs text-white group-hover:border-primary/50 transition-colors">
-                      {item.baseAsset.substring(0, 3)}
-                    </div>
+                    <PlatformBadge platformId={item.platform} size="w-4 h-4" />
                     <div>
-                      <div className="font-bold text-white text-sm flex items-center gap-1.5">
+                      <div className="font-bold text-white text-sm flex items-center gap-1">
                         <span>{item.baseAsset}</span>
                         <span className="text-[10px] text-text-muted font-normal">/ {item.quoteAsset}</span>
-                      </div>
-                      <div className="mt-0.5">
-                        <PlatformBadge platformId={item.platform} />
                       </div>
                     </div>
                   </div>
                 </td>
 
-                {/* 2. Market Type Badge (Spot vs Futures with distinctive color) */}
+                {/* 2. Market Type Badge (Icon only / compact badge) */}
                 <td className="p-3.5 text-center">
                   {item.market === 'FUTURES' ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30">
                       <span>⚡</span>
-                      <span>FUTURES</span>
+                      <span>FUT</span>
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30">
                       <span>🪙</span>
                       <span>SPOT</span>
                     </span>
@@ -164,7 +169,7 @@ export const LiveScannerTable = ({
                   </div>
                 </td>
 
-                {/* 4. 24h Change */}
+                {/* 4. Session Change (%) */}
                 <td className="p-3.5 text-right">
                   <span
                     className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold ${
@@ -172,6 +177,7 @@ export const LiveScannerTable = ({
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                         : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                     }`}
+                    title="التغير محسوب من سعر افتتاح/إغلاق الجلسة السابقة"
                   >
                     {formatPercent(item.priceChangePercent)}
                   </span>
@@ -215,7 +221,7 @@ export const LiveScannerTable = ({
                   </span>
                 </td>
 
-                {/* 8. Scalping Signals */}
+                {/* 8. Scalping Signals with Direct Sort */}
                 <td className="p-3.5 text-center">
                   <div className="flex flex-wrap items-center justify-center gap-1">
                     {signals.length > 0 ? (
