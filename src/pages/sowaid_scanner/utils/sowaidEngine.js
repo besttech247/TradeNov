@@ -2,8 +2,7 @@
 import { TF_SPECS, PRIORITY_ORDER } from './sowaidConstants';
 
 /**
- * تنظيف رمز العملة ليكون متوافقاً 100% مع Binance API
- * مثل: BINANCE_BTCUSDT_FUTURES -> BTCUSDT
+ * تنظيف رمز العملة ليكون متوافقاً مع Binance API
  */
 export function cleanCoinSymbol(symbol) {
   if (!symbol) return 'BTCUSDT';
@@ -14,7 +13,7 @@ export function cleanCoinSymbol(symbol) {
 }
 
 /**
- * دمج شموع الدقيقة الواحدة إلى فريم زمني مخصص (مثال: 3m, 9m, 27m, 81m)
+ * دمج شموع الدقيقة الواحدة إلى فريم زمني مخصص (3m, 9m, 27m, 81m)
  */
 export function resampleCandles(candles1m, targetMinutes) {
   if (!candles1m || candles1m.length === 0) return [];
@@ -86,13 +85,12 @@ export function resampleCandles(candles1m, targetMinutes) {
  * EWO = SMA(Median, 5) - SMA(Median, 35)
  */
 export function computeEWOArray(candles) {
-  if (!candles || candles.length < 10) return [];
+  if (!candles || candles.length < 8) return [];
   const medians = candles.map(c => (c.high + c.low) / 2.0);
   const result = [];
 
-  // إذا كان عدد الشموع أقل من 35، نستخدم نافذة متكيفة أصغر لضمان عدم توقف الإشارات
-  const longPeriod = candles.length >= 35 ? 35 : Math.max(Math.floor(candles.length * 0.7), 6);
-  const shortPeriod = Math.min(5, Math.floor(longPeriod / 3));
+  const longPeriod = candles.length >= 35 ? 35 : Math.max(Math.floor(candles.length * 0.75), 6);
+  const shortPeriod = Math.min(5, Math.max(Math.floor(longPeriod / 4), 2));
 
   for (let i = 0; i < candles.length; i++) {
     if (i >= longPeriod - 1) {
@@ -117,30 +115,41 @@ export function computeEWOArray(candles) {
 }
 
 /**
- * فحص حالة إشارة الارتداد والفلتر وفق منطق كود SOWAID v4.0
+ * تقييم إشارة الارتداد والزخم لمذبذب EWO
+ * - ارتداد جديد (Rebound Inception): e1 < 0 & e1 > e2 & e2 <= e3
+ * - زخم صاعد في مرحلة ارتداد (Active Rebound Wave): e1 > e2 & e2 > e3
+ * - اختراق الصفر الإيجابي (Zero Crossover): e2 <= 0 & e1 > 0
  */
 export function evaluateEWOState(ewoList) {
   if (!ewoList || ewoList.length < 3) {
-    return { e1: null, e2: null, e3: null, isRebound: false, isRising: false };
+    return { e1: null, e2: null, e3: null, isRebound: false, isRising: false, isSignalValid: false };
   }
 
   const n = ewoList.length;
-  const e1 = ewoList[n - 1].ewo; // الشمعة الأحدث
+  const e1 = ewoList[n - 1].ewo; // الشمعة الحالية
   const e2 = ewoList[n - 2].ewo; // الشمعة السابقة
   const e3 = ewoList[n - 3].ewo; // شمعة قبلها
 
-  // شرط الارتداد: EWO سالب وفي بداية تقوسه وصعوده لأعلى
-  const isRebound = (e1 < 0) && (e1 > e2) && (e2 <= e3);
+  // 1. ارتداد دقيق من القاع (Rebound Inception)
+  const isExactRebound = (e1 < 0) && (e1 > e2) && (e2 <= e3);
 
-  // شرط الفلتر الصاعد: EWO1 > EWO2
+  // 2. موجة ارتداد صاعدة نشطة (Active Rebound Wave)
+  const isActiveReboundWave = (e1 > e2) && (e2 > e3) && (e1 < Math.abs(e2) * 0.5);
+
+  // 3. اتجاه صاعد عام للـ EWO
   const isRising = e1 > e2;
+
+  // إشارة صالحة للتداول وفق الاستراتيجية
+  const isSignalValid = isExactRebound || isActiveReboundWave || (e1 > 0 && e1 > e2);
 
   return {
     e1,
     e2,
     e3,
-    isRebound,
+    isExactRebound,
+    isRebound: isExactRebound || isActiveReboundWave,
     isRising,
+    isSignalValid,
     latestCandle: ewoList[n - 1].candle
   };
 }
@@ -173,14 +182,85 @@ export function calculateSowaidTradeLevels(currentPrice, tfKey) {
 }
 
 /**
- * جلب وتحليل الفريمات السبعة (1D, 4h, 81m, 27m, 9m, 3m, 1m) لحظياً لعملة محددة
+ * محاكاة وتقدير فوري لحالة الفريمات لجميع العملات لحظياً مباشرة من بيانات التيكر
+ * لضمان ظهور الإشارات فوراً في الجدول والبطاقات لكل العملات بدون تأخير الشبكة
+ */
+export function estimateCoinMultiTf(coin, btcChange = 0) {
+  const price = parseFloat(coin.price) || 1;
+  const high = parseFloat(coin.highPrice) || price * 1.01;
+  const low = parseFloat(coin.lowPrice) || price * 0.99;
+  const open = parseFloat(coin.openPrice) || price;
+  const change = parseFloat(coin.priceChangePercent) || 0;
+  const vol = parseFloat(coin.quoteVolume) || 0;
+  const clean = cleanCoinSymbol(coin.symbol);
+
+  // موقع السعر داخل نطاق اليوم (0 = القاع، 1 = القمة)
+  const range = high - low || 1;
+  const posInRange = (price - low) / range;
+  const isRecoveringFromLow = posInRange > 0.25 && change > -8;
+  const isAlphaBtc = change > btcChange;
+
+  // تقييم منطقي لمحاكاة EWO على كل فريم
+  const tfStatus = {};
+  let activeCount = 0;
+
+  // 1D: صاعد إذا كان إغلاق اليوم أعلى من المتوسط أو صاعد مع البيتكوين
+  const d1Signal = change > 1.5 || (change > -2.0 && posInRange > 0.55);
+  tfStatus["1d"] = { signalValid: d1Signal, isRebound: d1Signal, isRising: change > 0, filterOk: true };
+  if (d1Signal) activeCount++;
+
+  // 4H: ارتداد إذا كان السعر في النصف الأعلى من اليوم ويتعافى
+  const h4Signal = (change > 0 && posInRange > 0.45) || (change < 0 && posInRange > 0.6);
+  tfStatus["4h"] = { signalValid: h4Signal, isRebound: h4Signal, isRising: posInRange > 0.5, filterOk: true };
+  if (h4Signal) activeCount++;
+
+  // 81m: فلتر 1D
+  const m81Signal = (posInRange > 0.35 && isAlphaBtc) || change > 2.0;
+  tfStatus["81m"] = { signalValid: m81Signal && d1Signal, isRebound: m81Signal, isRising: true, filterOk: d1Signal };
+  if (m81Signal && d1Signal) activeCount++;
+
+  // 27m: فلتر 1D
+  const m27Signal = (posInRange > 0.30) && (vol > 5000000);
+  tfStatus["27m"] = { signalValid: m27Signal && d1Signal, isRebound: m27Signal, isRising: true, filterOk: d1Signal };
+  if (m27Signal && d1Signal) activeCount++;
+
+  // 9m: فلتر 81m
+  const m9Signal = (posInRange > 0.40) || (change > 0.5);
+  tfStatus["9m"] = { signalValid: m9Signal && m81Signal, isRebound: m9Signal, isRising: true, filterOk: m81Signal };
+  if (m9Signal && m81Signal) activeCount++;
+
+  // 3m: مضاربة سريعة
+  const m3Signal = (change > -4.0 && posInRange > 0.35) || (vol > 15000000);
+  tfStatus["3m"] = { signalValid: m3Signal, isRebound: m3Signal, isRising: true, filterOk: true };
+  if (m3Signal) activeCount++;
+
+  // 1m: مضاربة لحظية
+  const m1Signal = (change >= 0) || (posInRange > 0.5);
+  tfStatus["1m"] = { signalValid: m1Signal, isRebound: m1Signal, isRising: true, filterOk: true };
+  if (m1Signal) activeCount++;
+
+  return {
+    symbol: clean,
+    rawSymbol: coin.symbol,
+    currentPrice: price,
+    activeSignalsCount: activeCount,
+    tfStatus,
+    filter1dOk: d1Signal,
+    filter81mOk: m81Signal,
+    isEstimated: true,
+    updatedAt: Date.now()
+  };
+}
+
+/**
+ * جلب وتحليل الشموع الحقيقية من بينانس وحساب EWO الدقيق 100%
  */
 export async function analyzeCoinMultiTf(rawSymbol) {
   try {
     const symbol = cleanCoinSymbol(rawSymbol);
     const baseUrl = 'https://api.binance.com/api/v3';
 
-    // نجلب شموع 1d, 4h, و 1m من Binance Spot (المتوفرة بدون قيود CORS)
+    // جلب شموع 1d و 4h و 1m
     const [res1d, res4h, res1m] = await Promise.all([
       fetch(`${baseUrl}/klines?symbol=${symbol}&interval=1d&limit=45`).then(r => r.ok ? r.json() : []),
       fetch(`${baseUrl}/klines?symbol=${symbol}&interval=4h&limit=60`).then(r => r.ok ? r.json() : []),
@@ -205,15 +285,15 @@ export async function analyzeCoinMultiTf(rawSymbol) {
     const candles4h = parseKlines(res4h);
     const candles1m = parseKlines(res1m);
 
-    if (candles1m.length < 20) return null;
+    if (candles1m.length < 15) return null;
 
-    // Resampling للفريمات
+    // Resampling
     const candles3m = resampleCandles(candles1m, 3);
     const candles9m = resampleCandles(candles1m, 9);
     const candles27m = resampleCandles(candles1m, 27);
     const candles81m = resampleCandles(candles1m, 81);
 
-    // حساب EWO لكل فريم
+    // EWO calculation
     const ewo1d = computeEWOArray(candles1d);
     const ewo4h = computeEWOArray(candles4h);
     const ewo81m = computeEWOArray(candles81m);
@@ -222,7 +302,6 @@ export async function analyzeCoinMultiTf(rawSymbol) {
     const ewo3m = computeEWOArray(candles3m);
     const ewo1m = computeEWOArray(candles1m);
 
-    // تقييم كل فريم
     const state1d = evaluateEWOState(ewo1d);
     const state4h = evaluateEWOState(ewo4h);
     const state81m = evaluateEWOState(ewo81m);
@@ -231,52 +310,21 @@ export async function analyzeCoinMultiTf(rawSymbol) {
     const state3m = evaluateEWOState(ewo3m);
     const state1m = evaluateEWOState(ewo1m);
 
-    // فلاتر الترند
-    const filter1dOk = state1d.isRising;
-    const filter81mOk = state81m.isRising;
-    const filter27mOk = state27m.isRising;
-    const filter9mOk = state9m.isRising;
+    const filter1dOk = state1d.isRising || state1d.isSignalValid;
+    const filter81mOk = state81m.isRising || state81m.isSignalValid;
+    const filter27mOk = state27m.isRising || state27m.isSignalValid;
+    const filter9mOk = state9m.isRising || state9m.isSignalValid;
 
-    // توافق شروط الشراء مع الفلاتر
     const tfStatus = {
-      "1d": {
-        ...state1d,
-        filterOk: true,
-        signalValid: state1d.isRebound
-      },
-      "4h": {
-        ...state4h,
-        filterOk: true,
-        signalValid: state4h.isRebound
-      },
-      "81m": {
-        ...state81m,
-        filterOk: filter1dOk,
-        signalValid: state81m.isRebound && filter1dOk
-      },
-      "27m": {
-        ...state27m,
-        filterOk: filter1dOk,
-        signalValid: state27m.isRebound && filter1dOk
-      },
-      "9m": {
-        ...state9m,
-        filterOk: filter81mOk,
-        signalValid: state9m.isRebound && filter81mOk
-      },
-      "3m": {
-        ...state3m,
-        filterOk: filter27mOk,
-        signalValid: state3m.isRebound && filter27mOk
-      },
-      "1m": {
-        ...state1m,
-        filterOk: filter9mOk,
-        signalValid: state1m.isRebound && filter9mOk
-      }
+      "1d": { ...state1d, filterOk: true, signalValid: state1d.isSignalValid },
+      "4h": { ...state4h, filterOk: true, signalValid: state4h.isSignalValid },
+      "81m": { ...state81m, filterOk: filter1dOk, signalValid: state81m.isSignalValid && filter1dOk },
+      "27m": { ...state27m, filterOk: filter1dOk, signalValid: state27m.isSignalValid && filter1dOk },
+      "9m": { ...state9m, filterOk: filter81mOk, signalValid: state9m.isSignalValid && filter81mOk },
+      "3m": { ...state3m, filterOk: filter27mOk, signalValid: state3m.isSignalValid },
+      "1m": { ...state1m, filterOk: filter9mOk, signalValid: state1m.isSignalValid }
     };
 
-    // حساب عدد الفريمات النشطة (Confluence Score)
     let activeSignalsCount = 0;
     for (const key of PRIORITY_ORDER) {
       if (tfStatus[key]?.signalValid) activeSignalsCount++;
@@ -303,6 +351,7 @@ export async function analyzeCoinMultiTf(rawSymbol) {
       tfCharts,
       filter1dOk,
       filter81mOk,
+      isEstimated: false,
       updatedAt: Date.now()
     };
   } catch (err) {

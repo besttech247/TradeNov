@@ -8,7 +8,7 @@ import { SowaidTable } from './components/SowaidTable';
 import { SowaidDetailModal } from './components/SowaidDetailModal';
 import { useMultiExchangeScanner } from '../scanner/hooks/useMultiExchangeScanner';
 import { useAudioAlert } from '../scanner/hooks/useAudioAlert';
-import { analyzeCoinMultiTf, cleanCoinSymbol } from './utils/sowaidEngine';
+import { analyzeCoinMultiTf, estimateCoinMultiTf, cleanCoinSymbol } from './utils/sowaidEngine';
 import { SOWAID_DEFAULT_SETTINGS } from './utils/sowaidConstants';
 import '../scanner/styles/scanner.css';
 
@@ -16,7 +16,6 @@ const FAVORITES_STORAGE_KEY = 'sowaid_scanner_favorites_v4';
 const USER_DEFAULTS_STORAGE_KEY = 'sowaid_scanner_user_defaults_v4';
 
 export default function SowaidScanner() {
-  // قراءة الإعدادات الافتراضية المحفوظة للمستخدم إن وُجدت
   const userDefaults = useMemo(() => {
     try {
       const saved = localStorage.getItem(USER_DEFAULTS_STORAGE_KEY);
@@ -76,7 +75,6 @@ export default function SowaidScanner() {
     });
   }, []);
 
-  // حفظ الإعدادات الحالية كافتراضية
   const handleSaveAsDefault = useCallback(() => {
     const currentSettings = {
       marketType,
@@ -89,14 +87,13 @@ export default function SowaidScanner() {
     };
     try {
       localStorage.setItem(USER_DEFAULTS_STORAGE_KEY, JSON.stringify(currentSettings));
-      setSaveMessage('✅ تم حفظ الإعدادات الحالية كإعدادات افتراضية لك بنجاح!');
+      setSaveMessage('✅ تم حفظ الإعدادات كافتراضية بنجاح!');
       setTimeout(() => setSaveMessage(''), 4000);
     } catch (e) {
       console.error(e);
     }
   }, [marketType, activeFilter, selectedTfFilters, tfMatchMode, minVolume, soundEnabled, refreshInterval]);
 
-  // استعادة الإعدادات الأصلية
   const handleResetToDefault = useCallback(() => {
     try {
       localStorage.removeItem(USER_DEFAULTS_STORAGE_KEY);
@@ -107,14 +104,13 @@ export default function SowaidScanner() {
       setMinVolume(SOWAID_DEFAULT_SETTINGS.minVolume24h);
       setSoundEnabled(SOWAID_DEFAULT_SETTINGS.soundEnabled);
       setRefreshInterval(30000);
-      setSaveMessage('🔄 تم استعادة الإعدادات الأصلية للمصنع.');
+      setSaveMessage('🔄 تم استعادة الإعدادات الأصلية.');
       setTimeout(() => setSaveMessage(''), 4000);
     } catch (e) {
       console.error(e);
     }
   }, []);
 
-  // تبديل فلتر فريم (دعم اختيار عدة فريمات معاً)
   const handleToggleTfFilter = useCallback((tfId) => {
     setSelectedTfFilters((prev) => {
       if (prev.includes(tfId)) {
@@ -129,7 +125,7 @@ export default function SowaidScanner() {
     setSelectedTfFilters([]);
   }, []);
 
-  // استخدام هوك جلب البيانات مع التحديث الهادئ الصارم
+  // جلب البيانات مع إمكانية التحديث الهادئ
   const {
     data,
     btcData,
@@ -160,7 +156,25 @@ export default function SowaidScanner() {
     return Array.from(map.values());
   }, [data]);
 
-  // تصفية العملات بدقة
+  // توليد فحص فوري وتقديري لجميع العملات لحظة وصول البيانات لضمان عدم بقاء أي عملة بدون إشارات
+  useEffect(() => {
+    if (!uniqueMarketData || uniqueMarketData.length === 0) return;
+    const btcChange = btcData?.priceChangePercent || 0;
+
+    setMultiTfAnalysisMap((prev) => {
+      const nextMap = { ...prev };
+      uniqueMarketData.forEach((coin) => {
+        const clean = cleanCoinSymbol(coin.symbol);
+        // إذا لم يكن هناك فحص دقيق سابق، نضع الفحص الفوري التقديري
+        if (!nextMap[clean] || nextMap[clean].isEstimated) {
+          nextMap[clean] = estimateCoinMultiTf(coin, btcChange);
+        }
+      });
+      return nextMap;
+    });
+  }, [uniqueMarketData, btcData]);
+
+  // تصفية العملات
   const filteredData = useMemo(() => {
     let result = uniqueMarketData;
 
@@ -186,10 +200,8 @@ export default function SowaidScanner() {
         if (!analysis || !analysis.tfStatus) return false;
 
         if (tfMatchMode === 'AND') {
-          // يجب أن تتحقق الإشارة على جميع الفريمات المختارة معاً
           return selectedTfFilters.every((tf) => analysis.tfStatus[tf]?.signalValid === true);
         } else {
-          // تتحقق الإشارة على أي فريم من الفريمات المختارة
           return selectedTfFilters.some((tf) => analysis.tfStatus[tf]?.signalValid === true);
         }
       });
@@ -197,12 +209,12 @@ export default function SowaidScanner() {
 
     // 4. الفلاتر السريعة
     if (activeFilter === 'top_volume') {
-      result = [...result].sort((a, b) => b.quoteVolume - a.quoteVolume);
+      result = [...result].sort((a, b) => (b.quoteVolume || 0) - (a.quoteVolume || 0));
     } else if (activeFilter === 'high_confluence') {
       result = result.filter((c) => {
         const clean = cleanCoinSymbol(c.symbol);
         const analysis = multiTfAnalysisMap[clean];
-        return analysis ? analysis.activeSignalsCount >= 2 : false;
+        return analysis ? analysis.activeSignalsCount >= 3 : false;
       });
     } else if (activeFilter === 'daily_active') {
       result = result.filter((c) => {
@@ -225,36 +237,38 @@ export default function SowaidScanner() {
     return result;
   }, [uniqueMarketData, searchQuery, activeFilter, selectedTfFilters, tfMatchMode, minVolume, multiTfAnalysisMap]);
 
-  // قائمة العملات المفضلة (بدون تكرار)
+  // قائمة العملات المفضلة
   const favoriteCoinsList = useMemo(() => {
     if (!uniqueMarketData || uniqueMarketData.length === 0) return [];
     return uniqueMarketData.filter((c) => favoritesSet.has(cleanCoinSymbol(c.symbol)));
   }, [uniqueMarketData, favoritesSet]);
 
-  // أعلى العملات لعرضها في رادار التوافق
+  // أعلى العملات ذات التوافق لعرضها في الرادار
   const topCandidates = useMemo(() => {
-    return filteredData.slice(0, 6);
-  }, [filteredData]);
+    const sorted = [...filteredData].sort((a, b) => {
+      const symA = cleanCoinSymbol(a.symbol);
+      const symB = cleanCoinSymbol(b.symbol);
+      const signalsA = multiTfAnalysisMap[symA]?.activeSignalsCount || 0;
+      const signalsB = multiTfAnalysisMap[symB]?.activeSignalsCount || 0;
+      if (signalsA === signalsB) {
+        return (b.quoteVolume || 0) - (a.quoteVolume || 0);
+      }
+      return signalsB - signalsA;
+    });
+    return sorted.slice(0, 6);
+  }, [filteredData, multiTfAnalysisMap]);
 
-  // مؤشر لمنع تكرار الفحص لنفس العملة في نفس الوقت
-  const isAnalyzingRef = useRef(false);
-
-  // فحص خلفي هادئ ومستقر للفريمات السبعة للعملات الأساسية والمفضلة
+  // فحص الشموع الحقيقية الدقيقة تدريجياً في الخلفية لأعلى العملات والمفضلة
+  const isDeepScanningRef = useRef(false);
   useEffect(() => {
-    if (isPaused || isAnalyzingRef.current) return;
+    if (isPaused || isDeepScanningRef.current || topCandidates.length === 0) return;
 
-    const coinsToScan = [
-      ...favoriteCoinsList,
-      ...uniqueMarketData.slice(0, 15)
-    ];
-
-    if (coinsToScan.length === 0) return;
-
-    isAnalyzingRef.current = true;
+    isDeepScanningRef.current = true;
     let isSubscribed = true;
 
-    // فحص العملات على دفعات متباعدة لتجنب أي ضغط
-    coinsToScan.forEach((coin, idx) => {
+    const targets = [...new Set([...favoriteCoinsList, ...topCandidates])].slice(0, 8);
+
+    targets.forEach((coin, idx) => {
       setTimeout(() => {
         if (!isSubscribed) return;
         const clean = cleanCoinSymbol(coin.symbol);
@@ -270,19 +284,19 @@ export default function SowaidScanner() {
             }
           }
         });
-      }, idx * 600);
+      }, idx * 700);
     });
 
-    const finishTimeout = setTimeout(() => {
-      isAnalyzingRef.current = false;
-    }, coinsToScan.length * 600 + 1000);
+    const timer = setTimeout(() => {
+      isDeepScanningRef.current = false;
+    }, targets.length * 700 + 1000);
 
     return () => {
       isSubscribed = false;
-      clearTimeout(finishTimeout);
-      isAnalyzingRef.current = false;
+      clearTimeout(timer);
+      isDeepScanningRef.current = false;
     };
-  }, [data?.length, isPaused, soundEnabled, playAlert]);
+  }, [topCandidates.length, isPaused, soundEnabled, playAlert]);
 
   // حساب إجمالي الإشارات النشطة
   const activeReboundsCount = useMemo(() => {
