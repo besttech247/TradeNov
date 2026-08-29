@@ -2,10 +2,12 @@
 import { TF_SPECS, PRIORITY_ORDER } from './sowaidConstants';
 
 /**
- * دمج شموع الدقيقة الواحدة إلى فريم زمني مخصص (مثال: 9m, 27m, 81m)
+ * دمج شموع الدقيقة الواحدة إلى فريم زمني مخصص (مثال: 3m, 9m, 27m, 81m)
  */
 export function resampleCandles(candles1m, targetMinutes) {
   if (!candles1m || candles1m.length === 0) return [];
+  if (targetMinutes === 1) return candles1m;
+
   const resampled = [];
   const bucketMs = targetMinutes * 60 * 1000;
   let currentBucket = null;
@@ -32,11 +34,13 @@ export function resampleCandles(candles1m, targetMinutes) {
     } else {
       resampled.push({
         timestamp: bStartTs,
+        time: bStartTs,
         open: bOpen,
         high: bHigh,
         low: bLow,
         close: bClose,
-        volume: bVol
+        volume: bVol,
+        isGreen: bClose >= bOpen
       });
       currentBucket = bucketId;
       bStartTs = bucketId * bucketMs;
@@ -51,11 +55,13 @@ export function resampleCandles(candles1m, targetMinutes) {
   if (currentBucket !== null) {
     resampled.push({
       timestamp: bStartTs,
+      time: bStartTs,
       open: bOpen,
       high: bHigh,
       low: bLow,
       close: bClose,
-      volume: bVol
+      volume: bVol,
+      isGreen: bClose >= bOpen
     });
   }
 
@@ -85,6 +91,7 @@ export function computeEWOArray(candles) {
       const ewo = sma5 - sma35;
       result.push({
         timestamp: candles[i].timestamp || candles[i].time,
+        time: candles[i].timestamp || candles[i].time,
         ewo: ewo,
         candle: candles[i]
       });
@@ -102,12 +109,11 @@ export function evaluateEWOState(ewoList) {
   }
 
   const n = ewoList.length;
-  const e1 = ewoList[n - 1].ewo; // الشمعة الأحدث المغلقة
+  const e1 = ewoList[n - 1].ewo; // الشمعة الأحدث
   const e2 = ewoList[n - 2].ewo; // الشمعة السابقة
   const e3 = ewoList[n - 3].ewo; // شمعة قبلها
 
-  // شرط الارتداد: EWO سالب وفي بداية صعوده وتقوسه لأعلى
-  // sig_rebound = (e1 < 0) and (e1 > e2) and (e2 <= e3)
+  // شرط الارتداد: EWO سالب وفي بداية تقوسه وصعوده لأعلى
   const isRebound = (e1 < 0) && (e1 > e2) && (e2 <= e3);
 
   // شرط الفلتر الصاعد: EWO1 > EWO2
@@ -151,7 +157,7 @@ export function calculateSowaidTradeLevels(currentPrice, tfKey) {
 }
 
 /**
- * جلب وتوليد تحليل الفريمات الخمسة (1D, 4h, 81m, 27m, 9m) لحظياً لعملة محددة
+ * جلب وتوليد تحليل الفريمات السبعة (1D, 4h, 81m, 27m, 9m, 3m, 1m) لحظياً لعملة محددة
  */
 export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
   try {
@@ -167,20 +173,23 @@ export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
 
     const parseKlines = (raw) => raw.map(r => ({
       timestamp: r[0],
+      time: r[0],
       open: parseFloat(r[1]),
       high: parseFloat(r[2]),
       low: parseFloat(r[3]),
       close: parseFloat(r[4]),
-      volume: parseFloat(r[5])
+      volume: parseFloat(r[5]),
+      isGreen: parseFloat(r[4]) >= parseFloat(r[1])
     }));
 
     const candles1d = parseKlines(res1d);
     const candles4h = parseKlines(res4h);
     const candles1m = parseKlines(res1m);
 
-    if (candles1m.length < 100) return null;
+    if (candles1m.length < 50) return null;
 
-    // Resampling لـ 9m, 27m, 81m
+    // Resampling لـ 3m, 9m, 27m, 81m
+    const candles3m = resampleCandles(candles1m, 3);
     const candles9m = resampleCandles(candles1m, 9);
     const candles27m = resampleCandles(candles1m, 27);
     const candles81m = resampleCandles(candles1m, 81);
@@ -191,6 +200,8 @@ export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
     const ewo81m = computeEWOArray(candles81m);
     const ewo27m = computeEWOArray(candles27m);
     const ewo9m = computeEWOArray(candles9m);
+    const ewo3m = computeEWOArray(candles3m);
+    const ewo1m = computeEWOArray(candles1m);
 
     // تقييم كل فريم
     const state1d = evaluateEWOState(ewo1d);
@@ -198,21 +209,25 @@ export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
     const state81m = evaluateEWOState(ewo81m);
     const state27m = evaluateEWOState(ewo27m);
     const state9m = evaluateEWOState(ewo9m);
+    const state3m = evaluateEWOState(ewo3m);
+    const state1m = evaluateEWOState(ewo1m);
 
     // فلاتر الترند
     const filter1dOk = state1d.isRising;
     const filter81mOk = state81m.isRising;
+    const filter27mOk = state27m.isRising;
+    const filter9mOk = state9m.isRising;
 
     // توافق شروط الشراء مع الفلاتر
     const tfStatus = {
       "1d": {
         ...state1d,
-        filterOk: true, // 1d no filter
+        filterOk: true,
         signalValid: state1d.isRebound
       },
       "4h": {
         ...state4h,
-        filterOk: true, // 4h no filter
+        filterOk: true,
         signalValid: state4h.isRebound
       },
       "81m": {
@@ -229,27 +244,46 @@ export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
         ...state9m,
         filterOk: filter81mOk,
         signalValid: state9m.isRebound && filter81mOk
+      },
+      "3m": {
+        ...state3m,
+        filterOk: filter27mOk,
+        signalValid: state3m.isRebound && filter27mOk
+      },
+      "1m": {
+        ...state1m,
+        filterOk: filter9mOk,
+        signalValid: state1m.isRebound && filter9mOk
       }
     };
 
-    // حساب عدد الفريمات النشطة (Confluence Score out of 5)
+    // حساب عدد الفريمات النشطة (Confluence Score)
     let activeSignalsCount = 0;
     for (const key of PRIORITY_ORDER) {
-      if (tfStatus[key].signalValid) activeSignalsCount++;
+      if (tfStatus[key]?.signalValid) activeSignalsCount++;
     }
 
     const currentPrice = candles1m[candles1m.length - 1].close;
+
+    // تجميع الشموع ومؤشر EWO لكل فريم لسرعة عرض الشارت في النافذة
+    const tfCharts = {
+      "1d": { candles: candles1d, ewo: ewo1d },
+      "4h": { candles: candles4h, ewo: ewo4h },
+      "81m": { candles: candles81m, ewo: ewo81m },
+      "27m": { candles: candles27m, ewo: ewo27m },
+      "9m": { candles: candles9m, ewo: ewo9m },
+      "3m": { candles: candles3m, ewo: ewo3m },
+      "1m": { candles: candles1m, ewo: ewo1m }
+    };
 
     return {
       symbol,
       currentPrice,
       activeSignalsCount,
       tfStatus,
+      tfCharts,
       filter1dOk,
       filter81mOk,
-      candles1m,
-      candles9m,
-      ewo9m,
       updatedAt: Date.now()
     };
   } catch (err) {

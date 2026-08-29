@@ -53,25 +53,57 @@ export const TF_SPECS = {
     filter: "81m",
     size_usd: 60.0,
     badgeColor: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+  },
+  "3m": {
+    label: "3 دقائق (3m)",
+    minutes: 3,
+    sl: 0.0040,      // 0.40%
+    trail: 0.0015,   // 0.15%
+    max: 5,
+    filter: "27m",
+    size_usd: 40.0,
+    badgeColor: "bg-teal-500/20 text-teal-400 border-teal-500/30"
+  },
+  "1m": {
+    label: "1 دقيقة (1m)",
+    minutes: 1,
+    sl: 0.0025,      // 0.25%
+    trail: 0.0010,   // 0.10%
+    max: 5,
+    filter: "9m",
+    size_usd: 30.0,
+    badgeColor: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30"
   }
 };
 
-export const PRIORITY_ORDER = ["1d", "4h", "81m", "27m", "9m"];
+export const PRIORITY_ORDER = ["1d", "4h", "81m", "27m", "9m", "3m", "1m"];
+
+export const TIMEFRAME_FILTERS = [
+  { id: 'all', label: '🌐 الكل (All TFs)' },
+  { id: '1d', label: '1D (يومي)' },
+  { id: '4h', label: '4H (4 ساعات)' },
+  { id: '81m', label: '81m (81 دقيقة)' },
+  { id: '27m', label: '27m (27 دقيقة)' },
+  { id: '9m', label: '9m (9 دقائق)' },
+  { id: '3m', label: '3m (3 دقائق)' },
+  { id: '1m', label: '1m (1 دقيقة)' }
+];
 
 export const SOWAID_FILTER_PRESETS = [
-  { id: 'all', label: '🌐 الكل (All Coins)', desc: 'عرض جميع العملات النشطة' },
-  { id: 'high_confluence', label: '🔥 أعلى توافق (Confluence 3+)', desc: 'عملات تظهر إشارات ارتداد على 3 فريمات فأكثر' },
-  { id: 'daily_active', label: '👑 الفريم اليومي (1D Active)', desc: 'ارتدادات الفريم اليومي الأكبر وزناً ($650)' },
-  { id: 'fast_scalp', label: '⚡ ارتداد سريع (9m/27m)', desc: 'صفقات المضاربة السريعة المتوافقة مع فلتر الترند' },
-  { id: 'top_volume', label: '🌊 أعلى سيولة', desc: 'أعلى حجم تداول 24 ساعة' }
+  { id: 'all', label: '⚡ جميع الإشارات' },
+  { id: 'high_confluence', label: '🔥 أعلى توافق (Confluence 3+)' },
+  { id: 'daily_active', label: '👑 الفريم اليومي (1D)' },
+  { id: 'fast_scalp', label: '⚡ مضاربة سريعة (1m/3m/9m)' },
+  { id: 'top_volume', label: '🌊 أعلى سيولة' }
 ];
 
 export const SOWAID_DEFAULT_SETTINGS = {
   marketType: 'ALL',
   activeFilter: 'all',
+  selectedTfFilter: 'all',
   searchQuery: '',
   minVolume24h: 100000,
-  soundEnabled: true,
+  soundEnabled: false, // افتراضياً صامت لمنع الإزعاج
   isPaused: false,
-  selectedTf: 'all'
+  autoRefreshInterval: 15000 // 15 ثانية للتحديث الهادئ السلس
 };
