@@ -7,6 +7,7 @@ import ApiHub from './pages/dev/ApiHub';
 import ProApp from './pages/pro/ProApp';
 import AgentApp from './pages/agent/AgentApp';
 import TradeNovScanner from './pages/scanner/TradeNovScanner';
+import SowaidScanner from './pages/sowaid_scanner/SowaidScanner';
 
 const Hub = () => (
   <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-8 text-center relative overflow-hidden bg-background">
@@ -70,14 +71,19 @@ const Hub = () => (
         </div>
       </Link>
 
-      {/* 3. New Option 2 (Placeholder) */}
-      <Link to="#" className="glass-panel p-4 hover:border-orange-500/40 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 opacity-80 hover:opacity-100">
-        <div className="text-right flex-1">
-          <h2 className="text-sm font-bold text-white">خيار جديد 2</h2>
-          <p className="text-[10px] text-text-muted">مساحة للإضافة مستقبلاً</p>
+      {/* 3. SOWAID Scanner v4.0 */}
+      <Link to="/sowaid-scanner" className="glass-panel p-4 hover:border-amber-500/60 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 relative overflow-hidden">
+        <div className="absolute top-1 left-2">
+          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+            v4.0
+          </span>
         </div>
-        <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
-          <span className="text-xl">📊</span>
+        <div className="text-right flex-1">
+          <h2 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">SOWAID Scanner v4.0</h2>
+          <p className="text-[10px] text-text-muted">ماسح ارتدادات EWO متعدد الفريمات وقناص القمم والقيعان</p>
+        </div>
+        <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(245,158,11,0.2)]">
+          <span className="text-xl">⚡</span>
         </div>
       </Link>
 
@@ -125,6 +131,8 @@ export default function App() {
         <Route path="/pro/*" element={<ProApp />} />
         <Route path="/agent/*" element={<AgentApp />} />
         <Route path="/scanner/*" element={<TradeNovScanner />} />
+        <Route path="/sowaid-scanner/*" element={<SowaidScanner />} />
+        <Route path="/scanner-v4/*" element={<SowaidScanner />} />
         <Route path="/dev/api-hub" element={<ApiHub />} />
       </Routes>
     </BrowserRouter>

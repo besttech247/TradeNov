@@ -1,0 +1,259 @@
+// SOWAID v4.0 Multi-Timeframe Strategy Mathematical Engine
+import { TF_SPECS, PRIORITY_ORDER } from './sowaidConstants';
+
+/**
+ * دمج شموع الدقيقة الواحدة إلى فريم زمني مخصص (مثال: 9m, 27m, 81m)
+ */
+export function resampleCandles(candles1m, targetMinutes) {
+  if (!candles1m || candles1m.length === 0) return [];
+  const resampled = [];
+  const bucketMs = targetMinutes * 60 * 1000;
+  let currentBucket = null;
+  let bOpen = null, bHigh = null, bLow = null, bClose = null, bVol = 0.0;
+  let bStartTs = null;
+
+  for (const c of candles1m) {
+    const ts = c.timestamp || c.time;
+    const bucketId = Math.floor(ts / bucketMs);
+
+    if (currentBucket === null) {
+      currentBucket = bucketId;
+      bStartTs = bucketId * bucketMs;
+      bOpen = c.open;
+      bHigh = c.high;
+      bLow = c.low;
+      bClose = c.close;
+      bVol = c.volume;
+    } else if (bucketId === currentBucket) {
+      if (c.high > bHigh) bHigh = c.high;
+      if (c.low < bLow) bLow = c.low;
+      bClose = c.close;
+      bVol += c.volume;
+    } else {
+      resampled.push({
+        timestamp: bStartTs,
+        open: bOpen,
+        high: bHigh,
+        low: bLow,
+        close: bClose,
+        volume: bVol
+      });
+      currentBucket = bucketId;
+      bStartTs = bucketId * bucketMs;
+      bOpen = c.open;
+      bHigh = c.high;
+      bLow = c.low;
+      bClose = c.close;
+      bVol = c.volume;
+    }
+  }
+
+  if (currentBucket !== null) {
+    resampled.push({
+      timestamp: bStartTs,
+      open: bOpen,
+      high: bHigh,
+      low: bLow,
+      close: bClose,
+      volume: bVol
+    });
+  }
+
+  return resampled;
+}
+
+/**
+ * حساب مذبذب موجات إليوت (Elliott Wave Oscillator)
+ * Median = (High + Low) / 2
+ * EWO = SMA(Median, 5) - SMA(Median, 35)
+ */
+export function computeEWOArray(candles) {
+  if (!candles || candles.length < 35) return [];
+  const medians = candles.map(c => (c.high + c.low) / 2.0);
+  const result = [];
+
+  for (let i = 0; i < candles.length; i++) {
+    if (i >= 34) {
+      let sum5 = 0;
+      for (let j = i - 4; j <= i; j++) sum5 += medians[j];
+      const sma5 = sum5 / 5.0;
+
+      let sum35 = 0;
+      for (let j = i - 34; j <= i; j++) sum35 += medians[j];
+      const sma35 = sum35 / 35.0;
+
+      const ewo = sma5 - sma35;
+      result.push({
+        timestamp: candles[i].timestamp || candles[i].time,
+        ewo: ewo,
+        candle: candles[i]
+      });
+    }
+  }
+  return result;
+}
+
+/**
+ * فحص حالة إشارة الارتداد والفلتر وفق منطق كود SOWAID v4.0
+ */
+export function evaluateEWOState(ewoList) {
+  if (!ewoList || ewoList.length < 3) {
+    return { e1: null, e2: null, e3: null, isRebound: false, isRising: false };
+  }
+
+  const n = ewoList.length;
+  const e1 = ewoList[n - 1].ewo; // الشمعة الأحدث المغلقة
+  const e2 = ewoList[n - 2].ewo; // الشمعة السابقة
+  const e3 = ewoList[n - 3].ewo; // شمعة قبلها
+
+  // شرط الارتداد: EWO سالب وفي بداية صعوده وتقوسه لأعلى
+  // sig_rebound = (e1 < 0) and (e1 > e2) and (e2 <= e3)
+  const isRebound = (e1 < 0) && (e1 > e2) && (e2 <= e3);
+
+  // شرط الفلتر الصاعد: EWO1 > EWO2
+  const isRising = e1 > e2;
+
+  return {
+    e1,
+    e2,
+    e3,
+    isRebound,
+    isRising,
+    latestCandle: ewoList[n - 1].candle
+  };
+}
+
+/**
+ * حساب مستويات الدخول ووقف الخسارة والـ Trailing Stop وفق مواصفات الاستراتيجية
+ */
+export function calculateSowaidTradeLevels(currentPrice, tfKey) {
+  const spec = TF_SPECS[tfKey] || TF_SPECS["81m"];
+  const slPct = spec.sl;
+  const trailPct = spec.trail;
+
+  const stopLossPrice = currentPrice * (1.0 - slPct);
+  const trailingTriggerPrice = currentPrice * (1.0 + trailPct * 1.5);
+  const recommendedSizeUsd = spec.size_usd;
+  const maxTrades = spec.max;
+
+  return {
+    entryPrice: currentPrice,
+    stopLossPrice,
+    stopLossPercent: (slPct * 100).toFixed(2),
+    trailingPercent: (trailPct * 100).toFixed(2),
+    trailingTriggerPrice,
+    recommendedSizeUsd,
+    maxTrades,
+    filterName: spec.filter,
+    label: spec.label,
+    badgeColor: spec.badgeColor
+  };
+}
+
+/**
+ * جلب وتوليد تحليل الفريمات الخمسة (1D, 4h, 81m, 27m, 9m) لحظياً لعملة محددة
+ */
+export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
+  try {
+    const isFutures = marketType === 'FUTURES';
+    const baseUrl = isFutures ? 'https://fapi.binance.com/fapi/v1' : 'https://api.binance.com/api/v3';
+
+    // نجلب شموع 1d, 4h, و 1m
+    const [res1d, res4h, res1m] = await Promise.all([
+      fetch(`${baseUrl}/klines?symbol=${symbol}&interval=1d&limit=60`).then(r => r.ok ? r.json() : []),
+      fetch(`${baseUrl}/klines?symbol=${symbol}&interval=4h&limit=100`).then(r => r.ok ? r.json() : []),
+      fetch(`${baseUrl}/klines?symbol=${symbol}&interval=1m&limit=1000`).then(r => r.ok ? r.json() : [])
+    ]);
+
+    const parseKlines = (raw) => raw.map(r => ({
+      timestamp: r[0],
+      open: parseFloat(r[1]),
+      high: parseFloat(r[2]),
+      low: parseFloat(r[3]),
+      close: parseFloat(r[4]),
+      volume: parseFloat(r[5])
+    }));
+
+    const candles1d = parseKlines(res1d);
+    const candles4h = parseKlines(res4h);
+    const candles1m = parseKlines(res1m);
+
+    if (candles1m.length < 100) return null;
+
+    // Resampling لـ 9m, 27m, 81m
+    const candles9m = resampleCandles(candles1m, 9);
+    const candles27m = resampleCandles(candles1m, 27);
+    const candles81m = resampleCandles(candles1m, 81);
+
+    // حساب EWO لكل فريم
+    const ewo1d = computeEWOArray(candles1d);
+    const ewo4h = computeEWOArray(candles4h);
+    const ewo81m = computeEWOArray(candles81m);
+    const ewo27m = computeEWOArray(candles27m);
+    const ewo9m = computeEWOArray(candles9m);
+
+    // تقييم كل فريم
+    const state1d = evaluateEWOState(ewo1d);
+    const state4h = evaluateEWOState(ewo4h);
+    const state81m = evaluateEWOState(ewo81m);
+    const state27m = evaluateEWOState(ewo27m);
+    const state9m = evaluateEWOState(ewo9m);
+
+    // فلاتر الترند
+    const filter1dOk = state1d.isRising;
+    const filter81mOk = state81m.isRising;
+
+    // توافق شروط الشراء مع الفلاتر
+    const tfStatus = {
+      "1d": {
+        ...state1d,
+        filterOk: true, // 1d no filter
+        signalValid: state1d.isRebound
+      },
+      "4h": {
+        ...state4h,
+        filterOk: true, // 4h no filter
+        signalValid: state4h.isRebound
+      },
+      "81m": {
+        ...state81m,
+        filterOk: filter1dOk,
+        signalValid: state81m.isRebound && filter1dOk
+      },
+      "27m": {
+        ...state27m,
+        filterOk: filter1dOk,
+        signalValid: state27m.isRebound && filter1dOk
+      },
+      "9m": {
+        ...state9m,
+        filterOk: filter81mOk,
+        signalValid: state9m.isRebound && filter81mOk
+      }
+    };
+
+    // حساب عدد الفريمات النشطة (Confluence Score out of 5)
+    let activeSignalsCount = 0;
+    for (const key of PRIORITY_ORDER) {
+      if (tfStatus[key].signalValid) activeSignalsCount++;
+    }
+
+    const currentPrice = candles1m[candles1m.length - 1].close;
+
+    return {
+      symbol,
+      currentPrice,
+      activeSignalsCount,
+      tfStatus,
+      filter1dOk,
+      filter81mOk,
+      candles1m,
+      candles9m,
+      ewo9m,
+      updatedAt: Date.now()
+    };
+  } catch (err) {
+    console.error(`Error analyzing ${symbol}:`, err);
+    return null;
+  }
+}
