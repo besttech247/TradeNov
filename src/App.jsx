@@ -81,16 +81,16 @@ const Hub = () => (
         </div>
       </Link>
 
-      {/* 2. TradeNov Scanner (Beta) */}
+      {/* 2. TradeNov Scanner (Beta v2.0) */}
       <Link to="/scanner" className="glass-panel p-4 hover:border-primary/60 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 relative overflow-hidden">
         <div className="absolute top-1 left-2">
           <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
-            BETA
+            BETA v2.0
           </span>
         </div>
         <div className="text-right flex-1">
-          <h2 className="text-sm font-bold text-white group-hover:text-primary transition-colors">TradeNov Scanner</h2>
-          <p className="text-[10px] text-text-muted">ماسح الكريبتو اللحظي والسيولة</p>
+          <h2 className="text-sm font-bold text-white group-hover:text-primary transition-colors">TradeNov Scanner (Beta v2.0)</h2>
+          <p className="text-[10px] text-text-muted">نظام الصفقات المزدوج (قناص يومي + مضاربة سريعة)</p>
         </div>
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(0,240,255,0.2)]">
           <span className="text-xl">🛰️</span>

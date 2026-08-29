@@ -149,6 +149,134 @@ export const detectScalpSignal = (item, btcChange = 0) => {
 };
 
 /**
+ * حساب مستويات الصفقة المقترحة (دخول معلق، وقف خسارة، هدف) بناءً على ATR
+ */
+export const calculateTradeLevels = (price, high, low, atrDist = null) => {
+  const currentP = parseFloat(price) || 0;
+  const h = parseFloat(high) || currentP * 1.02;
+  const l = parseFloat(low) || currentP * 0.98;
+  
+  // تقدير الـ ATR إن لم يكن متوفراً
+  const estimatedAtr = atrDist || (h - l) * 0.75 || currentP * 0.018;
+  
+  // الشراء عند إعادة اختبار تراجع 45% من المدى
+  const range = h - l;
+  const limitEntry = currentP - (0.35 * range);
+  const stopLoss = limitEntry - (1.6 * estimatedAtr);
+  const takeProfit = limitEntry + (3.5 * estimatedAtr);
+  
+  const risk = limitEntry - stopLoss;
+  const reward = takeProfit - limitEntry;
+  const rrRatio = risk > 0 ? (reward / risk).toFixed(1) : '2.2';
+
+  return {
+    limitEntry: limitEntry > 0 ? limitEntry : currentP,
+    stopLoss: stopLoss > 0 ? stopLoss : currentP * 0.98,
+    takeProfit: takeProfit > 0 ? takeProfit : currentP * 1.04,
+    riskPct: limitEntry > 0 ? (((limitEntry - stopLoss) / limitEntry) * 100).toFixed(2) : '1.80',
+    rewardPct: limitEntry > 0 ? (((takeProfit - limitEntry) / limitEntry) * 100).toFixed(2) : '4.00',
+    rrRatio: `1:${rrRatio}`
+  };
+};
+
+/**
+ * محرك فحص "صفقة القناص اليومية" (Daily Sniper - High Conviction)
+ * يبحث عن أفضل عملة قيادية حققت شروط POC + Squeeze + CVD الإيجابي
+ */
+export const evaluateDailySniper = (item, btcData = null) => {
+  const price = parseFloat(item.price || item.lastPrice) || 0;
+  const change = parseFloat(item.priceChangePercent) || 0;
+  const vol = parseFloat(item.quoteVolume) || 0;
+  const high = parseFloat(item.highPrice) || price * 1.02;
+  const low = parseFloat(item.lowPrice) || price * 0.98;
+  const btcChange = btcData ? parseFloat(btcData.priceChangePercent) || 0 : 0;
+  
+  // فلتر الأصول المؤهلة للقناص (العملات ذات السيولة العالية والقيادية)
+  const isEligibleSymbol = ['BTC', 'ETH', 'SOL', 'NEAR', 'SUI', 'AVAX', 'BNB'].some(s => item.symbol?.toUpperCase().includes(s));
+  
+  // الشروط الرياضية:
+  // 1. اتجاه صاعد صحي (بين 1.5% و 8.5%) غير محترق
+  const inSweetZone = change >= 1.5 && change <= 9.0;
+  // 2. سيولة نشطة قوية جداً
+  const highLiquidity = vol >= 30000000;
+  // 3. دلتا شراء إيجابية أو تفوق على البيتكوين
+  const alphaPositive = change >= btcChange;
+  
+  if (!inSweetZone || !highLiquidity || !alphaPositive) {
+    return null;
+  }
+
+  // تقدير خط الـ POC ونقطة التحكم
+  const pocPrice = low + ((high - low) * 0.55);
+  const isAbovePoc = price >= pocPrice;
+
+  // احتساب مستويات الدخول والهدف
+  const levels = calculateTradeLevels(price, high, low);
+
+  // حساب درجة ثقة القناص (Sniper Score)
+  let score = 75;
+  if (isEligibleSymbol) score += 12;
+  if (isAbovePoc) score += 8;
+  if (vol > 80000000) score += 5;
+  if (btcChange >= 0) score += 5;
+
+  return {
+    ...item,
+    strategy: 'DAILY_SNIPER',
+    score: Math.min(score, 99),
+    pocPrice,
+    levels,
+    badge: '🎯 قناص اليوم (High Alpha)',
+    reasons: [
+      'اختراق صاعد لكتلة الـ POC',
+      'انفجار الزخم مع حجم شراء مؤسساتي',
+      'دعم الاتجاه العام الصاعد للبيتكوين'
+    ]
+  };
+};
+
+/**
+ * محرك فحص "الصفقات السريعة" (Fast Scalp Signals - 2 إلى 5 يومياً)
+ */
+export const evaluateScalpSignal = (item, btcData = null) => {
+  const price = parseFloat(item.price || item.lastPrice) || 0;
+  const change = parseFloat(item.priceChangePercent) || 0;
+  const vol = parseFloat(item.quoteVolume) || 0;
+  const high = parseFloat(item.highPrice) || price * 1.02;
+  const low = parseFloat(item.lowPrice) || price * 0.98;
+
+  // صعود مبكر (2.0% إلى 12.0%) بحجم نشط
+  if (change < 2.0 || change > 14.0 || vol < 8000000) {
+    return null;
+  }
+
+  const range = high - low;
+  const scalpEntry = price - (0.25 * range);
+  const estimatedAtr = range * 0.6 || price * 0.015;
+  const scalpSL = scalpEntry - (1.2 * estimatedAtr);
+  const scalpTP = scalpEntry + (2.0 * estimatedAtr);
+
+  const risk = scalpEntry - scalpSL;
+  const reward = scalpTP - scalpEntry;
+
+  return {
+    ...item,
+    strategy: 'FAST_SCALP',
+    score: Math.min(70 + Math.round((vol / 1e7) * 3), 95),
+    scalpLevels: {
+      entry: scalpEntry > 0 ? scalpEntry : price,
+      stopLoss: scalpSL > 0 ? scalpSL : price * 0.985,
+      takeProfit: scalpTP > 0 ? scalpTP : price * 1.025,
+      riskPct: scalpEntry > 0 ? (((scalpEntry - scalpSL) / scalpEntry) * 100).toFixed(2) : '1.20',
+      rewardPct: scalpEntry > 0 ? (((scalpTP - scalpEntry) / scalpEntry) * 100).toFixed(2) : '2.40',
+      rrRatio: '1:2.0'
+    },
+    badge: '⚡ صفقة سريعة (15m)',
+    durationEst: '1 - 3 ساعات'
+  };
+};
+
+/**
  * حساب مجموع وزن الإشارات لترتيب الصفقات الحقيقية
  */
 export const getSignalsTotalWeight = (item, btcChange = 0) => {
@@ -162,3 +290,4 @@ export const getSignalsTotalWeight = (item, btcChange = 0) => {
 export const calculateMomentumScore = (item, btcChange = 0) => {
   return getSignalsTotalWeight(item, btcChange);
 };
+

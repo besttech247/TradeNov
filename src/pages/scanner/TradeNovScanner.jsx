@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { TopNav } from '../../shared/components/TopNav';
 import { ScannerHeader } from './components/ScannerHeader';
 import { ScannerStatsBar } from './components/ScannerStatsBar';
+import { SniperTradeCard } from './components/SniperTradeCard';
+import { ScalpSignalsGrid } from './components/ScalpSignalsGrid';
 import { MomentumCardsGrid } from './components/MomentumCardsGrid';
 import { LiveScannerTable } from './components/LiveScannerTable';
 import { QuickMiniChartModal } from './components/QuickMiniChartModal';
@@ -9,12 +11,23 @@ import { PlatformsFilterModal } from './components/PlatformsFilterModal';
 import { IconsLegendDrawer } from './components/IconsLegendDrawer';
 import { useMultiExchangeScanner } from './hooks/useMultiExchangeScanner';
 import { useAudioAlert } from './hooks/useAudioAlert';
-import { MARKET_TYPES, DEFAULT_SETTINGS } from './utils/scannerConstants';
-import { calculateBtcRelativeStrength } from './utils/technicalIndicators';
+import {
+  MARKET_TYPES,
+  STRATEGY_MODES,
+  DEFAULT_SETTINGS,
+  SCANNER_NAME,
+  SCANNER_VERSION
+} from './utils/scannerConstants';
+import {
+  calculateBtcRelativeStrength,
+  evaluateDailySniper,
+  evaluateScalpSignal
+} from './utils/technicalIndicators';
 import './styles/scanner.css';
 
 export default function TradeNovScanner() {
   const [marketType, setMarketType] = useState(DEFAULT_SETTINGS.marketType);
+  const [strategyMode, setStrategyMode] = useState(DEFAULT_SETTINGS.strategyMode);
   const [timeframe, setTimeframe] = useState(DEFAULT_SETTINGS.timeframe);
   const [activeFilter, setActiveFilter] = useState(DEFAULT_SETTINGS.activeFilter);
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,7 +50,7 @@ export default function TradeNovScanner() {
 
   const { playAlert } = useAudioAlert();
 
-  // تتبع الصفقات لإطلاق التنبيهات الصوتية عند الصعود السريع
+  // تتبع الصفقات لإطلاق التنبيهات الصوتية عند الصعود السريع أو إشارة القناص
   const prevTopGainerRef = useRef(null);
 
   useEffect(() => {
@@ -51,12 +64,14 @@ export default function TradeNovScanner() {
     prevTopGainerRef.current = topCoin;
   }, [data, soundEnabled, isPaused, playAlert]);
 
-  // تطبيق التصفية والبحث
+  // تطبيق التصفية والبحث عبر كافة العملات دون حدود
   const filteredData = useMemo(() => {
     let result = data;
 
-    // 1. تصفية الحد الأدنى للسيولة
-    result = result.filter(c => (c.quoteVolume || 0) >= minVolume);
+    // 1. تصفية الحد الأدنى للسيولة (إذا تم تعيينها > 0)
+    if (minVolume > 0) {
+      result = result.filter(c => (c.quoteVolume || 0) >= minVolume);
+    }
 
     // 2. تصفية البحث بالاسم أو الرمز
     if (searchQuery.trim()) {
@@ -67,12 +82,14 @@ export default function TradeNovScanner() {
     }
 
     // 3. تصفية حسب الفلاتر السريعة
-    if (activeFilter === 'volume_surge') {
+    if (activeFilter === 'sniper') {
+      result = result.filter(c => evaluateDailySniper(c, btcData) !== null);
+    } else if (activeFilter === 'scalp') {
+      result = result.filter(c => evaluateScalpSignal(c, btcData) !== null);
+    } else if (activeFilter === 'volume_surge') {
       result = result.filter((c) => c.quoteVolume > 30000000 && Math.abs(c.priceChangePercent) > 3.5);
     } else if (activeFilter === 'top_gainers') {
-      result = [...result].sort((a, b) => b.priceChangePercent - a.priceChangePercent).slice(0, 40);
-    } else if (activeFilter === 'top_losers') {
-      result = [...result].sort((a, b) => a.priceChangePercent - b.priceChangePercent).slice(0, 40);
+      result = [...result].sort((a, b) => b.priceChangePercent - a.priceChangePercent);
     } else if (activeFilter === 'funding_negative') {
       result = result.filter((c) => (c.fundingRate || 0) < -0.0001);
     } else if (activeFilter === 'alpha_btc') {
@@ -85,46 +102,57 @@ export default function TradeNovScanner() {
     return result;
   }, [data, searchQuery, activeFilter, minVolume, btcData]);
 
+  // استخراج "صفقة القناص اليومية" (صفقة واحدة فقط عالية الثقة والوزن)
+  const dailySniperCandidate = useMemo(() => {
+    if (!data || data.length === 0) return null;
+    const candidates = [];
+    for (const item of data) {
+      const sniper = evaluateDailySniper(item, btcData);
+      if (sniper) {
+        candidates.push(sniper);
+      }
+    }
+    if (candidates.length === 0) return null;
+    // الترتيب حسب أعلى سكور وجودة وسيولة
+    candidates.sort((a, b) => (b.score * b.quoteVolume) - (a.score * a.quoteVolume));
+    return candidates[0];
+  }, [data, btcData]);
+
+  // استخراج "صفقات السكالب السريعة" (2 إلى 5 صفقات يومياً)
+  const activeScalpSignals = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    const signals = [];
+    for (const item of data) {
+      const scalp = evaluateScalpSignal(item, btcData);
+      if (scalp) {
+        signals.push(scalp);
+      }
+    }
+    signals.sort((a, b) => b.score - a.score);
+    return signals.slice(0, 5);
+  }, [data, btcData]);
+
   return (
     <div className="tradenov-scanner-container px-4 sm:px-8 pb-12">
       {/* Dynamic Top Navigation with Build Date */}
-      <TopNav title="TradeNov Scanner (Beta v1.5)" />
+      <TopNav title={`${SCANNER_NAME} (${SCANNER_VERSION})`} />
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto">
-        {/* Title & Beta Notice */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-white/10 pb-4">
-          <div className="text-right">
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
-                <span>🛰️</span>
-                <span>TradeNov <span className="text-primary glow-text">Scanner</span></span>
-              </h2>
-              <span className="text-[10px] font-mono font-bold bg-primary/20 text-primary border border-primary/40 px-2.5 py-0.5 rounded-full animate-pulse">
-                PRO BETA v1.5
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-text-muted mt-1">
-              رادار السيولة المجمعة متعدد المنصات (Binance, Bybit, DEX) للسوق الفوري والعقود الآجلة.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs font-mono text-text-muted bg-white/[0.02] p-2 px-3 rounded-xl border border-white/5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>بث حي متعدد المصادر (CEX & DEX)</span>
-          </div>
-        </div>
-
-        {/* Header Controls */}
+        {/* Header Controls with Strategy Mode Tabs */}
         <ScannerHeader
           marketType={marketType}
           setMarketType={setMarketType}
+          strategyMode={strategyMode}
+          setStrategyMode={setStrategyMode}
           timeframe={timeframe}
           setTimeframe={setTimeframe}
           activeFilter={activeFilter}
           setActiveFilter={setActiveFilter}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          minVolume={minVolume}
+          setMinVolume={setMinVolume}
           soundEnabled={soundEnabled}
           setSoundEnabled={setSoundEnabled}
           isPaused={isPaused}
@@ -133,6 +161,7 @@ export default function TradeNovScanner() {
           connectionStatus={connectionStatus}
           onRefresh={refresh}
           loading={loading}
+          totalCoinsCount={data.length}
         />
 
         {/* Error Alert if any */}
@@ -141,6 +170,22 @@ export default function TradeNovScanner() {
             <span>⚠️ {error}</span>
             <button onClick={refresh} className="underline hover:text-white">إعادة المحاولة</button>
           </div>
+        )}
+
+        {/* 1. Daily Sniper Engine (المعروض دائماً في وضع القناص أو العرض الشامل) */}
+        {(strategyMode === STRATEGY_MODES.ALL || strategyMode === STRATEGY_MODES.SNIPER) && (
+          <SniperTradeCard
+            sniperSignal={dailySniperCandidate}
+            onSelectCoin={(coin) => setSelectedCoin(coin)}
+          />
+        )}
+
+        {/* 2. Fast Scalping Signals Grid (المعروض في وضع السكالب أو العرض الشامل) */}
+        {(strategyMode === STRATEGY_MODES.ALL || strategyMode === STRATEGY_MODES.SCALP) && (
+          <ScalpSignalsGrid
+            signals={activeScalpSignals}
+            onSelectCoin={(coin) => setSelectedCoin(coin)}
+          />
         )}
 
         {/* Collapsible Smart Momentum Grid */}
@@ -159,7 +204,7 @@ export default function TradeNovScanner() {
           marketType={marketType}
         />
 
-        {/* Live Interactive Scanner Table */}
+        {/* Live Interactive Scanner Table (مسح شامل بدون قيود لجميع العملات) */}
         <LiveScannerTable
           items={filteredData}
           btcData={btcData}

@@ -1,9 +1,18 @@
-// TradeNov Scanner Constants & Default Configurations
+// TradeNov Scanner Constants & Default Configurations (Beta v2.0)
+
+export const SCANNER_NAME = 'TradeNov Scanner';
+export const SCANNER_VERSION = 'Beta v2.0';
 
 export const MARKET_TYPES = {
   ALL: 'ALL',
   FUTURES: 'FUTURES',
   SPOT: 'SPOT'
+};
+
+export const STRATEGY_MODES = {
+  ALL: 'ALL',
+  SCALP: 'SCALP',   // صفقات سريعة (2 إلى 5 يومياً)
+  SNIPER: 'SNIPER'  // صفقة القناص اليومية (صفقة واحدة عالية الثقة)
 };
 
 export const PLATFORMS = [
@@ -21,25 +30,28 @@ export const TIMEFRAMES = [
 ];
 
 export const FILTER_PRESETS = [
-  { id: 'all', label: 'الكل (All Coins)', desc: 'عرض جميع الأزواج المتداولة النشطة' },
+  { id: 'all', label: '🌐 الكل (All Coins)', desc: 'عرض جميع الأزواج المتداولة النشطة بدون قيود' },
+  { id: 'sniper', label: '🎯 صفقة القناص (Sniper)', desc: 'صفقة اليوم الذهبية باختراق POC وتأكيد CVD' },
+  { id: 'scalp', label: '⚡ صفقات سريعة (2-5)', desc: 'انفجار TTM Squeeze مع زخم حجم ودلتا' },
   { id: 'volume_surge', label: '🌊 انفجار سيولة', desc: 'فوليوم مرتفع بشكل غير اعتيادي' },
   { id: 'top_gainers', label: '🚀 الأكثر صعوداً', desc: 'أعلى نسبة ارتفاع سعري' },
-  { id: 'top_losers', label: '📉 الأكثر هبوطاً', desc: 'فرص ارتداد من القيعان' },
   { id: 'funding_negative', label: '⚡ تمويل سلبي (Short Squeeze)', desc: 'عقود ذات معدل تمويل سلبي حاد' },
-  { id: 'alpha_btc', label: '🎯 تفوق على BTC', desc: 'عملات تتفوق على حركة البيتكوين' }
+  { id: 'alpha_btc', label: '🏆 تفوق على BTC', desc: 'عملات تتفوق على حركة البيتكوين' }
 ];
 
 export const DEFAULT_SETTINGS = {
   marketType: MARKET_TYPES.ALL,
-  timeframe: '5m',
+  strategyMode: STRATEGY_MODES.ALL,
+  timeframe: '15m',
   activeFilter: 'all',
   soundEnabled: true,
   isPaused: false,
   showHeatmap: true,
   enabledPlatforms: ['BINANCE', 'BYBIT', 'DEX'],
-  minVolume24h: 500000,
+  minVolume24h: 100000, // فلتر مرن يسمح بمسح أوسع للعملات
   autoRefreshInterval: 3000,
   searchQuery: '',
   sortBy: 'quoteVolume',
   sortDirection: 'desc'
 };
+
