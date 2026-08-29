@@ -11,7 +11,8 @@ const DEXSCREENER_TRENDING_URL = 'https://api.dexscreener.com/token-boosts/top/v
 export const useMultiExchangeScanner = (
   marketType = MARKET_TYPES.ALL,
   enabledPlatforms = ['BINANCE', 'BYBIT', 'DEX'],
-  isPaused = false
+  isPaused = false,
+  pollInterval = 5000
 ) => {
   const [data, setData] = useState([]);
   const [btcData, setBtcData] = useState(null);
@@ -196,12 +197,20 @@ export const useMultiExchangeScanner = (
   useEffect(() => {
     fetchAllExchanges();
 
-    // تشغيل مؤقت العد التنازلي للتحديث كل 5 ثوانٍ
+    if (!pollInterval || pollInterval <= 0) {
+      setNextRefreshCountdown(0);
+      return;
+    }
+
+    const intervalSec = Math.max(Math.round(pollInterval / 1000), 2);
+    setNextRefreshCountdown(intervalSec);
+
+    // تشغيل مؤقت العد التنازلي للتحديث الدوري
     const countdownTimer = setInterval(() => {
       setNextRefreshCountdown(prev => {
         if (prev <= 1) {
           fetchAllExchanges();
-          return 5;
+          return intervalSec;
         }
         return prev - 1;
       });
@@ -210,7 +219,7 @@ export const useMultiExchangeScanner = (
     return () => {
       clearInterval(countdownTimer);
     };
-  }, [fetchAllExchanges]);
+  }, [fetchAllExchanges, pollInterval]);
 
   return {
     data,

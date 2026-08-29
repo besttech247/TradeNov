@@ -2,6 +2,18 @@
 import { TF_SPECS, PRIORITY_ORDER } from './sowaidConstants';
 
 /**
+ * تنظيف رمز العملة ليكون متوافقاً 100% مع Binance API
+ * مثل: BINANCE_BTCUSDT_FUTURES -> BTCUSDT
+ */
+export function cleanCoinSymbol(symbol) {
+  if (!symbol) return 'BTCUSDT';
+  return symbol
+    .replace(/^(BINANCE_|BYBIT_|DEX_)/i, '')
+    .replace(/(_SPOT|_FUTURES)$/i, '')
+    .toUpperCase();
+}
+
+/**
  * دمج شموع الدقيقة الواحدة إلى فريم زمني مخصص (مثال: 3m, 9m, 27m, 81m)
  */
 export function resampleCandles(candles1m, targetMinutes) {
@@ -74,21 +86,25 @@ export function resampleCandles(candles1m, targetMinutes) {
  * EWO = SMA(Median, 5) - SMA(Median, 35)
  */
 export function computeEWOArray(candles) {
-  if (!candles || candles.length < 35) return [];
+  if (!candles || candles.length < 10) return [];
   const medians = candles.map(c => (c.high + c.low) / 2.0);
   const result = [];
 
+  // إذا كان عدد الشموع أقل من 35، نستخدم نافذة متكيفة أصغر لضمان عدم توقف الإشارات
+  const longPeriod = candles.length >= 35 ? 35 : Math.max(Math.floor(candles.length * 0.7), 6);
+  const shortPeriod = Math.min(5, Math.floor(longPeriod / 3));
+
   for (let i = 0; i < candles.length; i++) {
-    if (i >= 34) {
-      let sum5 = 0;
-      for (let j = i - 4; j <= i; j++) sum5 += medians[j];
-      const sma5 = sum5 / 5.0;
+    if (i >= longPeriod - 1) {
+      let sumShort = 0;
+      for (let j = i - shortPeriod + 1; j <= i; j++) sumShort += medians[j];
+      const smaShort = sumShort / shortPeriod;
 
-      let sum35 = 0;
-      for (let j = i - 34; j <= i; j++) sum35 += medians[j];
-      const sma35 = sum35 / 35.0;
+      let sumLong = 0;
+      for (let j = i - longPeriod + 1; j <= i; j++) sumLong += medians[j];
+      const smaLong = sumLong / longPeriod;
 
-      const ewo = sma5 - sma35;
+      const ewo = smaShort - smaLong;
       result.push({
         timestamp: candles[i].timestamp || candles[i].time,
         time: candles[i].timestamp || candles[i].time,
@@ -157,38 +173,41 @@ export function calculateSowaidTradeLevels(currentPrice, tfKey) {
 }
 
 /**
- * جلب وتوليد تحليل الفريمات السبعة (1D, 4h, 81m, 27m, 9m, 3m, 1m) لحظياً لعملة محددة
+ * جلب وتحليل الفريمات السبعة (1D, 4h, 81m, 27m, 9m, 3m, 1m) لحظياً لعملة محددة
  */
-export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
+export async function analyzeCoinMultiTf(rawSymbol) {
   try {
-    const isFutures = marketType === 'FUTURES';
-    const baseUrl = isFutures ? 'https://fapi.binance.com/fapi/v1' : 'https://api.binance.com/api/v3';
+    const symbol = cleanCoinSymbol(rawSymbol);
+    const baseUrl = 'https://api.binance.com/api/v3';
 
-    // نجلب شموع 1d, 4h, و 1m
+    // نجلب شموع 1d, 4h, و 1m من Binance Spot (المتوفرة بدون قيود CORS)
     const [res1d, res4h, res1m] = await Promise.all([
-      fetch(`${baseUrl}/klines?symbol=${symbol}&interval=1d&limit=60`).then(r => r.ok ? r.json() : []),
-      fetch(`${baseUrl}/klines?symbol=${symbol}&interval=4h&limit=100`).then(r => r.ok ? r.json() : []),
-      fetch(`${baseUrl}/klines?symbol=${symbol}&interval=1m&limit=1000`).then(r => r.ok ? r.json() : [])
+      fetch(`${baseUrl}/klines?symbol=${symbol}&interval=1d&limit=45`).then(r => r.ok ? r.json() : []),
+      fetch(`${baseUrl}/klines?symbol=${symbol}&interval=4h&limit=60`).then(r => r.ok ? r.json() : []),
+      fetch(`${baseUrl}/klines?symbol=${symbol}&interval=1m&limit=500`).then(r => r.ok ? r.json() : [])
     ]);
 
-    const parseKlines = (raw) => raw.map(r => ({
-      timestamp: r[0],
-      time: r[0],
-      open: parseFloat(r[1]),
-      high: parseFloat(r[2]),
-      low: parseFloat(r[3]),
-      close: parseFloat(r[4]),
-      volume: parseFloat(r[5]),
-      isGreen: parseFloat(r[4]) >= parseFloat(r[1])
-    }));
+    const parseKlines = (raw) => {
+      if (!Array.isArray(raw)) return [];
+      return raw.map(r => ({
+        timestamp: r[0],
+        time: r[0],
+        open: parseFloat(r[1]),
+        high: parseFloat(r[2]),
+        low: parseFloat(r[3]),
+        close: parseFloat(r[4]),
+        volume: parseFloat(r[5]),
+        isGreen: parseFloat(r[4]) >= parseFloat(r[1])
+      }));
+    };
 
     const candles1d = parseKlines(res1d);
     const candles4h = parseKlines(res4h);
     const candles1m = parseKlines(res1m);
 
-    if (candles1m.length < 50) return null;
+    if (candles1m.length < 20) return null;
 
-    // Resampling لـ 3m, 9m, 27m, 81m
+    // Resampling للفريمات
     const candles3m = resampleCandles(candles1m, 3);
     const candles9m = resampleCandles(candles1m, 9);
     const candles27m = resampleCandles(candles1m, 27);
@@ -265,7 +284,6 @@ export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
 
     const currentPrice = candles1m[candles1m.length - 1].close;
 
-    // تجميع الشموع ومؤشر EWO لكل فريم لسرعة عرض الشارت في النافذة
     const tfCharts = {
       "1d": { candles: candles1d, ewo: ewo1d },
       "4h": { candles: candles4h, ewo: ewo4h },
@@ -277,7 +295,8 @@ export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
     };
 
     return {
-      symbol,
+      symbol: cleanCoinSymbol(rawSymbol),
+      rawSymbol,
       currentPrice,
       activeSignalsCount,
       tfStatus,
@@ -287,7 +306,7 @@ export async function analyzeCoinMultiTf(symbol, marketType = 'FUTURES') {
       updatedAt: Date.now()
     };
   } catch (err) {
-    console.error(`Error analyzing ${symbol}:`, err);
+    console.error(`Error analyzing ${rawSymbol}:`, err);
     return null;
   }
 }

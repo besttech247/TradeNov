@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TF_SPECS, PRIORITY_ORDER } from '../utils/sowaidConstants';
-import { calculateSowaidTradeLevels } from '../utils/sowaidEngine';
+import { calculateSowaidTradeLevels, cleanCoinSymbol } from '../utils/sowaidEngine';
 
 export const SowaidTable = ({
   coins = [],
@@ -11,7 +11,7 @@ export const SowaidTable = ({
   isCollapsed,
   setIsCollapsed
 }) => {
-  // الترتيب الافتراضي بحسب عدد الإشارات المتوافقة كما طلب المستخدم تماماً
+  // الترتيب الافتراضي: بحسب عدد الإشارات المتوافقة تنازلياً
   const [sortField, setSortField] = useState('activeSignals');
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -20,25 +20,58 @@ export const SowaidTable = ({
       setSortAsc(!sortAsc);
     } else {
       setSortField(field);
-      setSortAsc(false);
+      setSortAsc(false); // تنازلياً دائماً عند الضغط الأول
     }
   };
 
-  const sortedCoins = [...coins].sort((a, b) => {
-    let aVal = a[sortField];
-    let bVal = b[sortField];
+  // دمج العملات المكررة (Binance Spot / Futures / Bybit) لكي يظهر كل رمز مرة واحدة فقط بنظافة
+  const uniqueCoins = useMemo(() => {
+    const map = new Map();
+    (coins || []).forEach((c) => {
+      const clean = cleanCoinSymbol(c.symbol);
+      if (!map.has(clean)) {
+        map.set(clean, c);
+      } else {
+        const existing = map.get(clean);
+        if (c.market === 'FUTURES' || (c.quoteVolume || 0) > (existing.quoteVolume || 0)) {
+          map.set(clean, c);
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [coins]);
 
-    if (sortField === 'activeSignals') {
-      aVal = multiTfAnalysisMap[a.symbol]?.activeSignalsCount || 0;
-      bVal = multiTfAnalysisMap[b.symbol]?.activeSignalsCount || 0;
-    }
+  // فرز القائمة بشكل مضمون ودقيق
+  const sortedCoins = useMemo(() => {
+    return [...uniqueCoins].sort((a, b) => {
+      const symA = cleanCoinSymbol(a.symbol);
+      const symB = cleanCoinSymbol(b.symbol);
 
-    if (aVal === bVal) {
-      // كسر التعادل بالسيولة
-      return (b.quoteVolume || 0) - (a.quoteVolume || 0);
-    }
-    return sortAsc ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
-  });
+      let aVal = 0;
+      let bVal = 0;
+
+      if (sortField === 'activeSignals') {
+        aVal = multiTfAnalysisMap[symA]?.activeSignalsCount || 0;
+        bVal = multiTfAnalysisMap[symB]?.activeSignalsCount || 0;
+      } else if (sortField === 'price') {
+        aVal = a.price || 0;
+        bVal = b.price || 0;
+      } else if (sortField === 'priceChangePercent') {
+        aVal = a.priceChangePercent || 0;
+        bVal = b.priceChangePercent || 0;
+      } else if (sortField === 'quoteVolume') {
+        aVal = a.quoteVolume || 0;
+        bVal = b.quoteVolume || 0;
+      }
+
+      if (aVal === bVal) {
+        // عند التعادل نفرز بالسيولة
+        return (b.quoteVolume || 0) - (a.quoteVolume || 0);
+      }
+
+      return sortAsc ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
+    });
+  }, [uniqueCoins, sortField, sortAsc, multiTfAnalysisMap]);
 
   return (
     <div className="scanner-glass overflow-hidden border border-white/5 mb-6">
@@ -48,14 +81,17 @@ export const SowaidTable = ({
         className="p-3.5 bg-black/40 border-b border-white/5 flex items-center justify-between cursor-pointer select-none"
       >
         <div className="flex items-center gap-2">
-          <span className="font-bold text-white text-sm">📋 جدول المسح المباشر (مرتب بحسب قوة الإشارات)</span>
-          <span className="text-[10px] text-text-muted bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
-            {coins.length} زوج معروض
+          <span className="font-bold text-white text-sm">📋 جدول المسح المباشر</span>
+          <span className="text-[10px] text-text-muted bg-white/5 px-2 py-0.5 rounded-full border border-white/5 font-mono">
+            {sortedCoins.length} عملة مميزة
+          </span>
+          <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-bold">
+            مرتب بـ: {sortField === 'activeSignals' ? '🎯 قوة الإشارات' : sortField === 'price' ? 'السعر' : sortField === 'priceChangePercent' ? 'التغير' : 'السيولة'} {sortAsc ? '▲' : '▼'}
           </span>
         </div>
 
         <div className="flex items-center gap-4 text-xs text-text-muted">
-          <span className="hidden sm:inline">اضغط على أي صف لفتح الشارت والـ EWO</span>
+          <span className="hidden sm:inline text-[11px]">اضغط على أي عمود لفرزه فوراً</span>
           <span className="font-mono">{isCollapsed ? '▼ عرض' : '▲ طي'}</span>
         </div>
       </div>
@@ -63,50 +99,51 @@ export const SowaidTable = ({
       {!isCollapsed && (
         <div className="overflow-x-auto animate-fade-in">
           <table className="w-full text-right text-xs">
-            <thead className="bg-white/5 text-text-muted font-mono uppercase text-[10px] border-b border-white/5">
+            <thead className="bg-white/5 text-text-muted font-mono uppercase text-[10px] border-b border-white/5 select-none">
               <tr>
                 <th className="py-3 px-3 text-center w-10">⭐</th>
                 <th className="py-3 px-4">الزوج / المنصة</th>
                 <th
-                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                  className={`py-3 px-4 cursor-pointer transition-colors ${sortField === 'price' ? 'text-amber-400 font-bold' : 'hover:text-white'}`}
                   onClick={() => handleSort('price')}
                 >
-                  السعر {sortField === 'price' && (sortAsc ? '▲' : '▼')}
+                  السعر {sortField === 'price' ? (sortAsc ? '▲' : '▼') : '↕'}
                 </th>
                 <th
-                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                  className={`py-3 px-4 cursor-pointer transition-colors ${sortField === 'priceChangePercent' ? 'text-amber-400 font-bold' : 'hover:text-white'}`}
                   onClick={() => handleSort('priceChangePercent')}
                 >
-                  تغير 24h {sortField === 'priceChangePercent' && (sortAsc ? '▲' : '▼')}
+                  تغير 24h {sortField === 'priceChangePercent' ? (sortAsc ? '▲' : '▼') : '↕'}
                 </th>
                 <th
-                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                  className={`py-3 px-4 cursor-pointer transition-colors ${sortField === 'quoteVolume' ? 'text-amber-400 font-bold' : 'hover:text-white'}`}
                   onClick={() => handleSort('quoteVolume')}
                 >
-                  السيولة (24h) {sortField === 'quoteVolume' && (sortAsc ? '▲' : '▼')}
+                  السيولة (24h) {sortField === 'quoteVolume' ? (sortAsc ? '▲' : '▼') : '↕'}
                 </th>
                 <th
-                  className="py-3 px-4 text-center cursor-pointer hover:text-amber-300 transition-colors bg-amber-500/5 font-bold"
+                  className={`py-3 px-4 text-center cursor-pointer transition-colors border-x border-white/5 ${sortField === 'activeSignals' ? 'text-amber-300 font-bold bg-amber-500/10' : 'hover:text-white bg-white/5'}`}
                   onClick={() => handleSort('activeSignals')}
                 >
                   🎯 الإشارات المتوافقة {sortField === 'activeSignals' ? (sortAsc ? '▲' : '▼') : '↕'}
                 </th>
-                <th className="py-3 px-4 text-center">رادار الفريمات (1D | 4h | 81m | 27m | 9m | 3m | 1m)</th>
+                <th className="py-3 px-4 text-center">رادار الفريمات الـ 7</th>
                 <th className="py-3 px-4">الصفقة الموصى بها</th>
                 <th className="py-3 px-4 text-center">إجراء</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {sortedCoins.slice(0, 60).map((coin) => {
-                const analysis = multiTfAnalysisMap[coin.symbol];
+              {sortedCoins.slice(0, 80).map((coin) => {
+                const cleanSym = cleanCoinSymbol(coin.symbol);
+                const analysis = multiTfAnalysisMap[cleanSym] || multiTfAnalysisMap[coin.symbol];
                 const activeCount = analysis?.activeSignalsCount || 0;
                 const bestTf = PRIORITY_ORDER.find(tf => analysis?.tfStatus?.[tf]?.signalValid) || "81m";
                 const levels = calculateSowaidTradeLevels(coin.price, bestTf);
-                const isFav = favoritesSet.has(coin.symbol);
+                const isFav = favoritesSet.has(cleanSym);
 
                 return (
                   <tr
-                    key={coin.id || coin.symbol}
+                    key={cleanSym}
                     onClick={() => onSelectCoin(coin)}
                     className="hover:bg-white/5 transition-colors cursor-pointer group"
                   >
@@ -115,9 +152,9 @@ export const SowaidTable = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onToggleFavorite(coin.symbol);
+                          onToggleFavorite(cleanSym);
                         }}
-                        className={`text-sm p-1 transition-transform hover:scale-125 ${
+                        className={`text-base p-1 transition-transform hover:scale-125 ${
                           isFav ? 'text-amber-400 font-bold' : 'text-white/20 hover:text-amber-300'
                         }`}
                         title={isFav ? 'إلغاء التثبيت من المفضلة' : 'تثبيت في المفضلة'}
@@ -130,10 +167,10 @@ export const SowaidTable = ({
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white text-sm group-hover:text-amber-400 transition-colors">
-                          {coin.symbol}
+                          {cleanSym}
                         </span>
                         <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-text-muted border border-white/5">
-                          {coin.platform}
+                          {coin.platform || 'BINANCE'}
                         </span>
                       </div>
                     </td>
@@ -159,7 +196,7 @@ export const SowaidTable = ({
 
                     {/* Volume */}
                     <td className="py-3 px-4 font-mono text-text-muted">
-                      ${(coin.quoteVolume / 1e6).toFixed(2)}M
+                      ${((coin.quoteVolume || 0) / 1e6).toFixed(2)}M
                     </td>
 
                     {/* Signals Count Badge */}
@@ -191,7 +228,7 @@ export const SowaidTable = ({
                                   ? 'bg-emerald-500 text-black font-bold'
                                   : 'text-white/30'
                               }`}
-                              title={`${tf}: ${active ? 'إشارة ارتداد متوافقة' : 'محايد'}`}
+                              title={`${tf}: ${active ? 'إشارة ارتداد نشطة' : 'محايد'}`}
                             >
                               {tf}
                             </span>

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TF_SPECS, PRIORITY_ORDER } from '../utils/sowaidConstants';
-import { calculateSowaidTradeLevels } from '../utils/sowaidEngine';
+import { calculateSowaidTradeLevels, cleanCoinSymbol } from '../utils/sowaidEngine';
 
 export const SowaidFavoritesGrid = ({
   favoriteCoins = [],
@@ -10,12 +10,30 @@ export const SowaidFavoritesGrid = ({
   isCollapsed,
   setIsCollapsed
 }) => {
-  if (!favoriteCoins || favoriteCoins.length === 0) {
+  // منع تكرار البطاقات نهائياً: دمج العملات بنفس الرمز (1 عملة مفضلة = بطاقة واحدة فقط دائماً)
+  const uniqueFavorites = useMemo(() => {
+    const map = new Map();
+    (favoriteCoins || []).forEach((c) => {
+      const cleanSym = cleanCoinSymbol(c.symbol);
+      if (!map.has(cleanSym)) {
+        map.set(cleanSym, c);
+      } else {
+        const existing = map.get(cleanSym);
+        // نفضل العقود الآجلة أو الحجم الأكبر
+        if (c.market === 'FUTURES' || (c.quoteVolume || 0) > (existing.quoteVolume || 0)) {
+          map.set(cleanSym, c);
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [favoriteCoins]);
+
+  if (uniqueFavorites.length === 0) {
     return (
       <div className="scanner-glass p-3.5 mb-6 border border-white/5 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs text-text-muted">
-          <span>⭐</span>
-          <span>قائمة المفضلة فارغة حالياً. اضغط على النجمة (⭐) بجانب أي عملة في الجدول لتثبيتها هنا كبطاقة دائمة.</span>
+          <span className="text-amber-400">⭐</span>
+          <span>قائمة المفضلة فارغة حالياً. اضغط على النجمة (⭐) بجانب أي عملة في الجدول لتثبيتها كبطاقة دائمة.</span>
         </div>
       </div>
     );
@@ -32,7 +50,7 @@ export const SowaidFavoritesGrid = ({
           <span className="text-amber-400 text-base">⭐</span>
           <h3 className="font-bold text-white text-sm">البطاقات المفضلة والمثبتة (Pinned Favorites)</h3>
           <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-            {favoriteCoins.length} عملات مثبتة
+            {uniqueFavorites.length} عملات مثبتة
           </span>
         </div>
 
@@ -45,15 +63,16 @@ export const SowaidFavoritesGrid = ({
       {/* Grid Content */}
       {!isCollapsed && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-3">
-          {favoriteCoins.map((coin) => {
-            const analysis = multiTfAnalysisMap[coin.symbol];
+          {uniqueFavorites.map((coin) => {
+            const cleanSym = cleanCoinSymbol(coin.symbol);
+            const analysis = multiTfAnalysisMap[cleanSym] || multiTfAnalysisMap[coin.symbol];
             const activeCount = analysis?.activeSignalsCount || 0;
             const highestTf = PRIORITY_ORDER.find(tf => analysis?.tfStatus?.[tf]?.signalValid) || "81m";
             const tradeLevels = calculateSowaidTradeLevels(coin.price, highestTf);
 
             return (
               <div
-                key={coin.id || coin.symbol}
+                key={cleanSym}
                 onClick={() => onSelectCoin(coin)}
                 className="bg-black/40 hover:bg-black/60 p-3.5 rounded-xl border border-white/10 hover:border-amber-500/40 transition-all cursor-pointer group flex flex-col justify-between relative overflow-hidden"
               >
@@ -61,11 +80,11 @@ export const SowaidFavoritesGrid = ({
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center font-bold text-amber-400 text-xs">
-                      {coin.baseAsset?.slice(0, 3) || coin.symbol.slice(0, 3)}
+                      {cleanSym.replace('USDT', '').slice(0, 3)}
                     </div>
                     <div>
-                      <div className="font-bold text-white text-xs">{coin.symbol}</div>
-                      <div className="text-[10px] text-text-muted font-mono">${(coin.quoteVolume / 1e6).toFixed(1)}M</div>
+                      <div className="font-bold text-white text-xs">{cleanSym}</div>
+                      <div className="text-[10px] text-text-muted font-mono">${((coin.quoteVolume || 0) / 1e6).toFixed(1)}M</div>
                     </div>
                   </div>
 
@@ -82,9 +101,9 @@ export const SowaidFavoritesGrid = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onToggleFavorite(coin.symbol);
+                        onToggleFavorite(cleanSym);
                       }}
-                      className="text-amber-400 hover:scale-125 transition-transform text-sm p-1"
+                      className="text-amber-400 hover:scale-125 transition-transform text-base p-0.5"
                       title="إلغاء التثبيت من المفضلة"
                     >
                       ★
@@ -116,7 +135,7 @@ export const SowaidFavoritesGrid = ({
 
                 {/* Footer specs */}
                 <div className="flex items-center justify-between text-[10px] font-mono text-text-muted border-t border-white/5 pt-1.5">
-                  <span className="text-amber-300">توافق: {activeCount}/7</span>
+                  <span className="text-amber-300 font-bold">توافق: {activeCount}/7</span>
                   <span className="text-rose-400">وقف: -{tradeLevels.stopLossPercent}%</span>
                   <span className="text-sky-400">تتبع: +{tradeLevels.trailingPercent}%</span>
                 </div>
