@@ -4,6 +4,7 @@ import { ScannerHeader } from './components/ScannerHeader';
 import { ScannerStatsBar } from './components/ScannerStatsBar';
 import { SniperTradeCard } from './components/SniperTradeCard';
 import { ScalpSignalsGrid } from './components/ScalpSignalsGrid';
+import { RecentSignalsTracker } from './components/RecentSignalsTracker';
 import { MomentumCardsGrid } from './components/MomentumCardsGrid';
 import { LiveScannerTable } from './components/LiveScannerTable';
 import { QuickMiniChartModal } from './components/QuickMiniChartModal';
@@ -25,6 +26,8 @@ import {
 } from './utils/technicalIndicators';
 import './styles/scanner.css';
 
+const LOCAL_STORAGE_KEY = 'tradenov_scanner_recent_signals';
+
 export default function TradeNovScanner() {
   const [marketType, setMarketType] = useState(DEFAULT_SETTINGS.marketType);
   const [strategyMode, setStrategyMode] = useState(DEFAULT_SETTINGS.strategyMode);
@@ -38,6 +41,16 @@ export default function TradeNovScanner() {
   const [isPlatformsModalOpen, setIsPlatformsModalOpen] = useState(false);
   const [selectedCoin, setSelectedCoin] = useState(null);
 
+  // سجل آخر 5 صفقات المحفوظ محلياً
+  const [recentSignals, setRecentSignals] = useState(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const {
     data,
     btcData,
@@ -49,6 +62,18 @@ export default function TradeNovScanner() {
   } = useMultiExchangeScanner(marketType, enabledPlatforms, isPaused);
 
   const { playAlert } = useAudioAlert();
+
+  // خريطة سريعة لجلب السعر اللحظي لأي عملة
+  const currentDataMap = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(data)) {
+      data.forEach((c) => {
+        map.set(c.id, c);
+        map.set(c.symbol, c);
+      });
+    }
+    return map;
+  }, [data]);
 
   // تتبع الصفقات لإطلاق التنبيهات الصوتية عند الصعود السريع أو إشارة القناص
   const prevTopGainerRef = useRef(null);
@@ -70,7 +95,7 @@ export default function TradeNovScanner() {
 
     // 1. تصفية الحد الأدنى للسيولة (إذا تم تعيينها > 0)
     if (minVolume > 0) {
-      result = result.filter(c => (c.quoteVolume || 0) >= minVolume);
+      result = result.filter((c) => (c.quoteVolume || 0) >= minVolume);
     }
 
     // 2. تصفية البحث بالاسم أو الرمز
@@ -83,9 +108,9 @@ export default function TradeNovScanner() {
 
     // 3. تصفية حسب الفلاتر السريعة
     if (activeFilter === 'sniper') {
-      result = result.filter(c => evaluateDailySniper(c, btcData) !== null);
+      result = result.filter((c) => evaluateDailySniper(c, btcData) !== null);
     } else if (activeFilter === 'scalp') {
-      result = result.filter(c => evaluateScalpSignal(c, btcData) !== null);
+      result = result.filter((c) => evaluateScalpSignal(c, btcData) !== null);
     } else if (activeFilter === 'volume_surge') {
       result = result.filter((c) => c.quoteVolume > 30000000 && Math.abs(c.priceChangePercent) > 3.5);
     } else if (activeFilter === 'top_gainers') {
@@ -113,8 +138,7 @@ export default function TradeNovScanner() {
       }
     }
     if (candidates.length === 0) return null;
-    // الترتيب حسب أعلى سكور وجودة وسيولة
-    candidates.sort((a, b) => (b.score * b.quoteVolume) - (a.score * a.quoteVolume));
+    candidates.sort((a, b) => b.score * b.quoteVolume - a.score * a.quoteVolume);
     return candidates[0];
   }, [data, btcData]);
 
@@ -131,6 +155,61 @@ export default function TradeNovScanner() {
     signals.sort((a, b) => b.score - a.score);
     return signals.slice(0, 5);
   }, [data, btcData]);
+
+  // حفظ وتحديث آخر 5 صفقات تلقائياً في السجل
+  useEffect(() => {
+    const toAdd = [];
+    if (dailySniperCandidate) {
+      toAdd.push({
+        id: dailySniperCandidate.id || dailySniperCandidate.symbol,
+        symbol: dailySniperCandidate.symbol,
+        strategy: 'DAILY_SNIPER',
+        signalPrice: dailySniperCandidate.price,
+        platform: dailySniperCandidate.platform || 'BINANCE',
+        timestamp: Date.now()
+      });
+    }
+
+    if (activeScalpSignals.length > 0) {
+      activeScalpSignals.slice(0, 3).forEach((s) => {
+        toAdd.push({
+          id: s.id || s.symbol,
+          symbol: s.symbol,
+          strategy: 'FAST_SCALP',
+          signalPrice: s.price,
+          platform: s.platform || 'BINANCE',
+          timestamp: Date.now()
+        });
+      });
+    }
+
+    if (toAdd.length === 0) return;
+
+    setRecentSignals((prev) => {
+      let updated = [...prev];
+      toAdd.forEach((newItem) => {
+        // إذا لم تكن مضافة خلال آخر ساعتين
+        const existingIdx = updated.findIndex((u) => u.symbol === newItem.symbol && u.strategy === newItem.strategy);
+        if (existingIdx === -1) {
+          updated = [newItem, ...updated];
+        }
+      });
+      const trimmed = updated.slice(0, 5);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(trimmed));
+      } catch (e) {
+        console.error('Failed to save recent signals:', e);
+      }
+      return trimmed;
+    });
+  }, [dailySniperCandidate, activeScalpSignals]);
+
+  const handleClearHistory = () => {
+    setRecentSignals([]);
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+    } catch {}
+  };
 
   return (
     <div className="tradenov-scanner-container px-4 sm:px-8 pb-12">
@@ -188,6 +267,14 @@ export default function TradeNovScanner() {
           />
         )}
 
+        {/* 3. Recent 5 Signals Live Performance Tracker (سجل آخر 5 صفقات مع عداد الوقت والتغير السعري) */}
+        <RecentSignalsTracker
+          recentSignals={recentSignals}
+          currentDataMap={currentDataMap}
+          onSelectCoin={(coin) => setSelectedCoin(coin)}
+          onClearHistory={handleClearHistory}
+        />
+
         {/* Collapsible Smart Momentum Grid */}
         <MomentumCardsGrid
           items={filteredData}
@@ -217,7 +304,7 @@ export default function TradeNovScanner() {
         {/* Collapsible Icons & Signals Legend Drawer */}
         <IconsLegendDrawer />
 
-        {/* Quick Candlestick Mini-Chart Modal */}
+        {/* Quick Candlestick Mini-Chart Modal (with Volume Profile POC and Levels) */}
         {selectedCoin && (
           <QuickMiniChartModal
             coin={selectedCoin}
