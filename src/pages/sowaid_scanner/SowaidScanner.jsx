@@ -8,7 +8,7 @@ import { SowaidTable } from './components/SowaidTable';
 import { SowaidDetailModal } from './components/SowaidDetailModal';
 import { useMultiExchangeScanner } from '../scanner/hooks/useMultiExchangeScanner';
 import { useAudioAlert } from '../scanner/hooks/useAudioAlert';
-import { analyzeCoinMultiTf, estimateCoinMultiTf, cleanCoinSymbol } from './utils/sowaidEngine';
+import { analyzeCoinMultiTf, cleanCoinSymbol } from './utils/sowaidEngine';
 import { SOWAID_DEFAULT_SETTINGS } from './utils/sowaidConstants';
 import '../scanner/styles/scanner.css';
 
@@ -49,9 +49,9 @@ export default function SowaidScanner() {
   const [favorites, setFavorites] = useState(() => {
     try {
       const saved = localStorage.getItem(FAVORITES_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : ['BTCUSDT', 'SOLUSDT', 'ETHUSDT'];
+      return saved ? JSON.parse(saved) : ['BTCUSDT', 'SOLUSDT', 'ETHUSDT', 'HYPEUSDT'];
     } catch {
-      return ['BTCUSDT', 'SOLUSDT', 'ETHUSDT'];
+      return ['BTCUSDT', 'SOLUSDT', 'ETHUSDT', 'HYPEUSDT'];
     }
   });
 
@@ -125,7 +125,7 @@ export default function SowaidScanner() {
     setSelectedTfFilters([]);
   }, []);
 
-  // جلب البيانات مع إمكانية التحديث الهادئ
+  // جلب البيانات من المنصات
   const {
     data,
     btcData,
@@ -136,7 +136,7 @@ export default function SowaidScanner() {
 
   const { playAlert } = useAudioAlert();
 
-  // خريطة لتخزين نتائج فحص EWO متعدد الفريمات للعملات
+  // خريطة لتخزين نتائج فحص EWO متعدد الفريمات الحقيقية 100%
   const [multiTfAnalysisMap, setMultiTfAnalysisMap] = useState({});
 
   // دمج العملات المكررة في data
@@ -156,23 +156,73 @@ export default function SowaidScanner() {
     return Array.from(map.values());
   }, [data]);
 
-  // توليد فحص فوري وتقديري لجميع العملات لحظة وصول البيانات لضمان عدم بقاء أي عملة بدون إشارات
-  useEffect(() => {
-    if (!uniqueMarketData || uniqueMarketData.length === 0) return;
-    const btcChange = btcData?.priceChangePercent || 0;
+  // قائمة العملات المفضلة
+  const favoriteCoinsList = useMemo(() => {
+    if (!uniqueMarketData || uniqueMarketData.length === 0) return [];
+    return uniqueMarketData.filter((c) => favoritesSet.has(cleanCoinSymbol(c.symbol)));
+  }, [uniqueMarketData, favoritesSet]);
 
-    setMultiTfAnalysisMap((prev) => {
-      const nextMap = { ...prev };
-      uniqueMarketData.forEach((coin) => {
-        const clean = cleanCoinSymbol(coin.symbol);
-        // إذا لم يكن هناك فحص دقيق سابق، نضع الفحص الفوري التقديري
-        if (!nextMap[clean] || nextMap[clean].isEstimated) {
-          nextMap[clean] = estimateCoinMultiTf(coin, btcChange);
-        }
-      });
-      return nextMap;
+  // فحص الشموع الحقيقية 100% عبر Binance و Bybit للعملات المعروضة في الشاشة
+  const isScanningRef = useRef(false);
+  const scannedSymbolsRef = useRef(new Set());
+
+  const runAnalysisForSymbols = useCallback((symbolsList) => {
+    if (!symbolsList || symbolsList.length === 0) return;
+
+    symbolsList.forEach((sym, idx) => {
+      const clean = cleanCoinSymbol(sym);
+      if (scannedSymbolsRef.current.has(clean)) return;
+      scannedSymbolsRef.current.add(clean);
+
+      setTimeout(() => {
+        analyzeCoinMultiTf(clean).then((res) => {
+          if (res) {
+            setMultiTfAnalysisMap((prev) => ({
+              ...prev,
+              [clean]: res
+            }));
+
+            if (soundEnabled && res.activeSignalsCount >= 4) {
+              playAlert('BULLISH');
+            }
+          }
+        });
+      }, idx * 400);
     });
-  }, [uniqueMarketData, btcData]);
+  }, [soundEnabled, playAlert]);
+
+  // فحص الشموع الحقيقية للعملات المفضلة وأعلى العملات سيولة
+  useEffect(() => {
+    if (isPaused || isScanningRef.current || !uniqueMarketData || uniqueMarketData.length === 0) return;
+
+    isScanningRef.current = true;
+
+    // أهم العملات التي يجب حساب شمعات الـ EWO الحقيقية لها
+    const priorityCoins = [
+      ...favorites,
+      ...uniqueMarketData.slice(0, 15).map(c => c.symbol)
+    ];
+
+    runAnalysisForSymbols(priorityCoins);
+
+    const timer = setTimeout(() => {
+      isScanningRef.current = false;
+    }, priorityCoins.length * 400 + 1000);
+
+    return () => {
+      clearTimeout(timer);
+      isScanningRef.current = false;
+    };
+  }, [uniqueMarketData?.length, favorites, isPaused, runAnalysisForSymbols]);
+
+  // فحص فوري عند كتابة اسم أي عملة في مربع البحث (مثل HYPE)
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    const clean = cleanCoinSymbol(searchQuery.trim());
+    if (clean.length >= 3 && !multiTfAnalysisMap[clean]) {
+      runAnalysisForSymbols([clean]);
+    }
+  }, [searchQuery, multiTfAnalysisMap, runAnalysisForSymbols]);
 
   // تصفية العملات
   const filteredData = useMemo(() => {
@@ -237,13 +287,7 @@ export default function SowaidScanner() {
     return result;
   }, [uniqueMarketData, searchQuery, activeFilter, selectedTfFilters, tfMatchMode, minVolume, multiTfAnalysisMap]);
 
-  // قائمة العملات المفضلة
-  const favoriteCoinsList = useMemo(() => {
-    if (!uniqueMarketData || uniqueMarketData.length === 0) return [];
-    return uniqueMarketData.filter((c) => favoritesSet.has(cleanCoinSymbol(c.symbol)));
-  }, [uniqueMarketData, favoritesSet]);
-
-  // أعلى العملات ذات التوافق لعرضها في الرادار
+  // أعلى العملات ذات التوافق الحقيقي لعرضها في الرادار
   const topCandidates = useMemo(() => {
     const sorted = [...filteredData].sort((a, b) => {
       const symA = cleanCoinSymbol(a.symbol);
@@ -257,46 +301,6 @@ export default function SowaidScanner() {
     });
     return sorted.slice(0, 6);
   }, [filteredData, multiTfAnalysisMap]);
-
-  // فحص الشموع الحقيقية الدقيقة تدريجياً في الخلفية لأعلى العملات والمفضلة
-  const isDeepScanningRef = useRef(false);
-  useEffect(() => {
-    if (isPaused || isDeepScanningRef.current || topCandidates.length === 0) return;
-
-    isDeepScanningRef.current = true;
-    let isSubscribed = true;
-
-    const targets = [...new Set([...favoriteCoinsList, ...topCandidates])].slice(0, 8);
-
-    targets.forEach((coin, idx) => {
-      setTimeout(() => {
-        if (!isSubscribed) return;
-        const clean = cleanCoinSymbol(coin.symbol);
-        analyzeCoinMultiTf(clean).then((res) => {
-          if (res && isSubscribed) {
-            setMultiTfAnalysisMap((prev) => ({
-              ...prev,
-              [clean]: res
-            }));
-
-            if (soundEnabled && res.activeSignalsCount >= 4) {
-              playAlert('BULLISH');
-            }
-          }
-        });
-      }, idx * 700);
-    });
-
-    const timer = setTimeout(() => {
-      isDeepScanningRef.current = false;
-    }, targets.length * 700 + 1000);
-
-    return () => {
-      isSubscribed = false;
-      clearTimeout(timer);
-      isDeepScanningRef.current = false;
-    };
-  }, [topCandidates.length, isPaused, soundEnabled, playAlert]);
 
   // حساب إجمالي الإشارات النشطة
   const activeReboundsCount = useMemo(() => {
@@ -335,7 +339,10 @@ export default function SowaidScanner() {
         refreshInterval={refreshInterval}
         setRefreshInterval={setRefreshInterval}
         connectionStatus={connectionStatus}
-        onRefresh={refresh}
+        onRefresh={() => {
+          scannedSymbolsRef.current.clear();
+          refresh();
+        }}
         loading={loading}
         onSaveAsDefault={handleSaveAsDefault}
         onResetToDefault={handleResetToDefault}
