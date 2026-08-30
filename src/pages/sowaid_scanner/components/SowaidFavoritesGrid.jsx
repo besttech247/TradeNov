@@ -67,7 +67,7 @@ export const SowaidFavoritesGrid = ({
             const cleanSym = cleanCoinSymbol(coin.symbol);
             const analysis = multiTfAnalysisMap[cleanSym] || multiTfAnalysisMap[coin.symbol];
             const activeCount = analysis?.activeSignalsCount || 0;
-            const highestTf = PRIORITY_ORDER.find(tf => analysis?.tfStatus?.[tf]?.signalValid) || "81m";
+            const highestTf = PRIORITY_ORDER.find(tf => analysis?.tfStatus?.[tf]?.signalValid || analysis?.tfStatus?.[tf]?.isSignalValid) || "81m";
             const tradeLevels = calculateSowaidTradeLevels(coin.price, highestTf);
 
             return (
@@ -115,7 +115,7 @@ export const SowaidFavoritesGrid = ({
                 <div className="bg-white/5 p-1.5 rounded-lg border border-white/5 my-2">
                   <div className="grid grid-cols-7 gap-0.5 text-center font-mono text-[9px]">
                     {PRIORITY_ORDER.map((tf) => {
-                      const isValid = analysis?.tfStatus?.[tf]?.signalValid;
+                      const isValid = analysis?.tfStatus?.[tf]?.signalValid || analysis?.tfStatus?.[tf]?.isSignalValid;
                       return (
                         <div
                           key={tf}

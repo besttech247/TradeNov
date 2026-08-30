@@ -61,7 +61,7 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
   const e3 = tfStatus?.e3;
   const isRebound = tfStatus?.isRebound;
   const filterOk = tfStatus?.filterOk;
-  const isSignalValid = tfStatus?.signalValid;
+  const isSignalValid = tfStatus?.signalValid || tfStatus?.isSignalValid;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in">
@@ -115,7 +115,7 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
                 <span className="text-xs text-text-muted font-bold mr-1">الفريم النشط:</span>
                 {PRIORITY_ORDER.map((tf) => {
                   const state = analysis?.tfStatus?.[tf];
-                  const isValid = state?.signalValid;
+                  const isValid = state?.signalValid || state?.isSignalValid;
                   const isSelected = selectedTf === tf;
 
                   return (

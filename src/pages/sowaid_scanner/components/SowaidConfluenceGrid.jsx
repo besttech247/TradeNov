@@ -37,9 +37,10 @@ export const SowaidConfluenceGrid = ({
       {!isCollapsed && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 animate-fade-in">
           {topCoins.map((coin) => {
-            const analysis = multiTfAnalysisMap[coin.symbol];
-            const activeCount = analysis?.activeSignalsCount || (coin.priceChangePercent > 2 ? 3 : 1);
-            const highestTf = PRIORITY_ORDER.find(tf => analysis?.tfStatus?.[tf]?.signalValid) || "81m";
+            const cleanSym = cleanCoinSymbol(coin.symbol);
+            const analysis = multiTfAnalysisMap[cleanSym] || multiTfAnalysisMap[coin.symbol];
+            const activeCount = analysis?.activeSignalsCount || 0;
+            const highestTf = PRIORITY_ORDER.find(tf => analysis?.tfStatus?.[tf]?.signalValid || analysis?.tfStatus?.[tf]?.isSignalValid) || "81m";
             const tradeLevels = calculateSowaidTradeLevels(coin.price, highestTf);
             const isFav = favoritesSet.has(coin.symbol);
 
@@ -110,7 +111,7 @@ export const SowaidConfluenceGrid = ({
                   <div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px]">
                     {PRIORITY_ORDER.map((tf) => {
                       const status = analysis?.tfStatus?.[tf];
-                      const isValid = status ? status.signalValid : false;
+                      const isValid = status ? (status.signalValid || status.isSignalValid) : false;
                       return (
                         <div
                           key={tf}

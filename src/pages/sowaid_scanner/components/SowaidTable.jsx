@@ -137,7 +137,7 @@ export const SowaidTable = ({
                 const cleanSym = cleanCoinSymbol(coin.symbol);
                 const analysis = multiTfAnalysisMap[cleanSym] || multiTfAnalysisMap[coin.symbol];
                 const activeCount = analysis?.activeSignalsCount || 0;
-                const bestTf = PRIORITY_ORDER.find(tf => analysis?.tfStatus?.[tf]?.signalValid) || "81m";
+                const bestTf = PRIORITY_ORDER.find(tf => analysis?.tfStatus?.[tf]?.signalValid || analysis?.tfStatus?.[tf]?.isSignalValid) || "81m";
                 const levels = calculateSowaidTradeLevels(coin.price, bestTf);
                 const isFav = favoritesSet.has(cleanSym);
 
@@ -219,7 +219,7 @@ export const SowaidTable = ({
                       <div className="inline-flex items-center gap-0.5 bg-black/40 px-1.5 py-0.5 rounded-lg border border-white/5 font-mono text-[8px]">
                         {PRIORITY_ORDER.map((tf) => {
                           const status = analysis?.tfStatus?.[tf];
-                          const active = status?.signalValid;
+                          const active = status?.signalValid || status?.isSignalValid;
                           return (
                             <span
                               key={tf}
