@@ -370,7 +370,9 @@ export async function analyzeCoinMultiTf(rawSymbol) {
     const filter27mOk = state27m.e1 !== null && state27m.e2 !== null ? state27m.e1 > state27m.e2 : true;
     const filter9mOk = state9m.e1 !== null && state9m.e2 !== null ? state9m.e1 > state9m.e2 : true;
 
-    // توافق الشروط مع الفلاتر وفق back.py
+    // توافق الشروط مع الفلاتر وفق back.py:
+    // الشارات المرئية (greenSignal / yellowSignal) تظهر نقية ومستقلة تماماً لكل فريم دون أي فلتر
+    // صلاحية الدخول في الصفقة (signalValid) هي وحدها التي تشترط تحقق فلتر الفريم الأكبر
     const tfStatus = {
       "1d": {
         ...state1d,
@@ -392,7 +394,7 @@ export async function analyzeCoinMultiTf(rawSymbol) {
         ...state81m,
         filterOk: filter1dOk,
         rawSignal: state81m.isGreenSignal,
-        greenSignal: state81m.isGreenSignal && filter1dOk,
+        greenSignal: state81m.isGreenSignal,
         signalValid: state81m.isGreenSignal && filter1dOk,
         yellowSignal: state81m.isYellowSignal
       },
@@ -400,7 +402,7 @@ export async function analyzeCoinMultiTf(rawSymbol) {
         ...state27m,
         filterOk: filter1dOk,
         rawSignal: state27m.isGreenSignal,
-        greenSignal: state27m.isGreenSignal && filter1dOk,
+        greenSignal: state27m.isGreenSignal,
         signalValid: state27m.isGreenSignal && filter1dOk,
         yellowSignal: state27m.isYellowSignal
       },
@@ -408,7 +410,7 @@ export async function analyzeCoinMultiTf(rawSymbol) {
         ...state9m,
         filterOk: filter81mOk,
         rawSignal: state9m.isGreenSignal,
-        greenSignal: state9m.isGreenSignal && filter81mOk,
+        greenSignal: state9m.isGreenSignal,
         signalValid: state9m.isGreenSignal && filter81mOk,
         yellowSignal: state9m.isYellowSignal
       },
@@ -416,7 +418,7 @@ export async function analyzeCoinMultiTf(rawSymbol) {
         ...state3m,
         filterOk: filter27mOk,
         rawSignal: state3m.isGreenSignal,
-        greenSignal: state3m.isGreenSignal && filter27mOk,
+        greenSignal: state3m.isGreenSignal,
         signalValid: state3m.isGreenSignal && filter27mOk,
         yellowSignal: state3m.isYellowSignal
       },
@@ -424,7 +426,7 @@ export async function analyzeCoinMultiTf(rawSymbol) {
         ...state1m,
         filterOk: filter9mOk,
         rawSignal: state1m.isGreenSignal,
-        greenSignal: state1m.isGreenSignal && filter9mOk,
+        greenSignal: state1m.isGreenSignal,
         signalValid: state1m.isGreenSignal && filter9mOk,
         yellowSignal: state1m.isYellowSignal
       }
@@ -433,7 +435,7 @@ export async function analyzeCoinMultiTf(rawSymbol) {
     let activeSignalsCount = 0;
     let yellowSignalsCount = 0;
     for (const key of PRIORITY_ORDER) {
-      if (tfStatus[key]?.signalValid || tfStatus[key]?.greenSignal) activeSignalsCount++;
+      if (tfStatus[key]?.greenSignal) activeSignalsCount++;
       if (tfStatus[key]?.yellowSignal) yellowSignalsCount++;
     }
 
