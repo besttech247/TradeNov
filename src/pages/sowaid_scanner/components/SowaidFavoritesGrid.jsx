@@ -115,16 +115,20 @@ export const SowaidFavoritesGrid = ({
                 <div className="bg-white/5 p-1.5 rounded-lg border border-white/5 my-2">
                   <div className="grid grid-cols-7 gap-0.5 text-center font-mono text-[9px]">
                     {PRIORITY_ORDER.map((tf) => {
-                      const isValid = analysis?.tfStatus?.[tf]?.signalValid || analysis?.tfStatus?.[tf]?.isSignalValid;
+                      const status = analysis?.tfStatus?.[tf];
+                      const isGreen = status?.greenSignal || status?.signalValid;
+                      const isYellow = status?.yellowSignal;
                       return (
                         <div
                           key={tf}
-                          className={`py-0.5 rounded ${
-                            isValid
-                              ? 'bg-emerald-500 text-black font-bold'
+                          className={`py-0.5 rounded transition-all ${
+                            isGreen
+                              ? 'bg-emerald-500 text-black font-bold shadow-[0_0_6px_rgba(52,211,153,0.5)]'
+                              : isYellow
+                              ? 'bg-yellow-400 text-black font-bold shadow-[0_0_6px_rgba(250,204,21,0.5)]'
                               : 'text-white/30'
                           }`}
-                          title={`${tf}: ${isValid ? 'ارتداد نشط' : 'محايد'}`}
+                          title={`${tf}: ${isGreen ? '🟢 صعود مؤكد (دخول)' : isYellow ? '🟡 استعداد (تباطؤ الهبوط)' : 'محايد'}`}
                         >
                           {tf}
                         </div>

@@ -59,9 +59,12 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
   const e1 = tfStatus?.e1;
   const e2 = tfStatus?.e2;
   const e3 = tfStatus?.e3;
-  const isRebound = tfStatus?.isRebound;
+  const diffCurr = tfStatus?.diffCurr;
+  const diffPrev = tfStatus?.diffPrev;
+  const isGreen = tfStatus?.greenSignal || tfStatus?.signalValid;
+  const isYellow = tfStatus?.yellowSignal;
   const filterOk = tfStatus?.filterOk;
-  const isSignalValid = tfStatus?.signalValid || tfStatus?.isSignalValid;
+  const isSignalValid = isGreen;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in">
@@ -75,8 +78,8 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-2xl font-black text-white">{coin.symbol}</h2>
-                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
-                  SOWAID v4.0 Matrix
+                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-white/5 text-text-muted border border-white/10">
+                  {coin.platform || 'Binance / Bybit'}
                 </span>
                 <button
                   onClick={() => onToggleFavorite && onToggleFavorite(coin.symbol)}
@@ -88,9 +91,11 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
                   {isFavorite ? '★ مثبت في المفضلة' : '☆ تثبيت'}
                 </button>
               </div>
-              <p className="text-xs text-text-muted mt-0.5 font-mono">
-                السعر الحالي: ${currentPrice < 1 ? currentPrice.toFixed(4) : currentPrice.toFixed(2)} | التغير: {coin.priceChangePercent > 0 ? '+' : ''}{coin.priceChangePercent?.toFixed(2)}% | السيولة: ${(coin.quoteVolume / 1e6).toFixed(2)}M
-              </p>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted mt-1 font-mono">
+                <span>السعر: <b className="text-white font-bold">${currentPrice < 1 ? currentPrice.toFixed(4) : currentPrice.toFixed(2)}</b></span>
+                <span>التغير: <b className={coin.priceChangePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{coin.priceChangePercent >= 0 ? '+' : ''}{coin.priceChangePercent?.toFixed(2)}%</b></span>
+                <span>قيمة EWO ({selectedTf}): <b className={e1 >= 0 ? 'text-emerald-400 font-bold' : isYellow ? 'text-yellow-400 font-bold' : 'text-white/80'}>{e1 !== undefined && e1 !== null ? e1.toFixed(4) : '—'}</b></span>
+              </div>
             </div>
           </div>
 
@@ -112,10 +117,11 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
             {/* 1. Timeframe Switcher Tabs (All 7 TFs) */}
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4 bg-black/40 p-2 rounded-2xl border border-white/5">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-text-muted font-bold mr-1">الفريم النشط:</span>
+                <span className="text-xs text-text-muted font-bold mr-1">الفريم:</span>
                 {PRIORITY_ORDER.map((tf) => {
                   const state = analysis?.tfStatus?.[tf];
-                  const isValid = state?.signalValid || state?.isSignalValid;
+                  const tfIsGreen = state?.greenSignal || state?.signalValid;
+                  const tfIsYellow = state?.yellowSignal;
                   const isSelected = selectedTf === tf;
 
                   return (
@@ -129,16 +135,24 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
                       }`}
                     >
                       <span>{tf}</span>
-                      {isValid && (
-                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-black' : 'bg-emerald-400'}`} />
-                      )}
+                      {tfIsGreen ? (
+                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-950' : 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]'}`} title="🟢 صعود مؤكد" />
+                      ) : tfIsYellow ? (
+                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-950' : 'bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.9)]'}`} title="🟡 استعداد" />
+                      ) : null}
                     </button>
                   );
                 })}
               </div>
 
-              <div className="text-xs font-mono text-amber-300 font-bold px-2 py-1 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                حالة إشارة {selectedTf}: {isSignalValid ? '✅ ارتداد مؤكد ومكتمل' : '⏸ غير مكتمل'}
+              <div className={`text-xs font-mono font-bold px-3 py-1 rounded-xl border flex items-center gap-1.5 ${
+                isGreen
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_10px_rgba(52,211,153,0.2)]'
+                  : isYellow
+                  ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 shadow-[0_0_10px_rgba(250,204,21,0.2)]'
+                  : 'bg-white/5 text-white/40 border-white/10'
+              }`}>
+                <span>{isGreen ? '🟢 صعود مؤكد (تنفيذ الشراء)' : isYellow ? '🟡 استعداد (تباطؤ الهبوط)' : '⏸ محايد (لا توجد إشارة)'}</span>
               </div>
             </div>
 
@@ -146,12 +160,13 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
             <div className="bg-black/50 p-4 rounded-2xl border border-white/5 mb-3">
               <div className="flex items-center justify-between text-xs font-mono text-text-muted mb-2 border-b border-white/5 pb-1.5">
                 <span className="text-white font-bold flex items-center gap-2">
-                  <span>📈 شارت الشموع لفريم [{activeTfSpecs.label}]</span>
+                  <span>📈 شارت الشموع [{activeTfSpecs.label}]</span>
                   <span className="text-[10px] text-text-muted font-normal">({candles.length} شمعة)</span>
                 </span>
-                <div className="flex items-center gap-3 text-[11px]">
-                  <span>أعلى: <b className="text-white">${maxPrice.toFixed(4)}</b></span>
-                  <span>أدنى: <b className="text-white">${minPrice.toFixed(4)}</b></span>
+                <div className="flex items-center gap-4 text-[11px]">
+                  <span className="text-amber-300">السعر الحالي: <b className="text-white font-bold">${currentPrice < 1 ? currentPrice.toFixed(4) : currentPrice.toFixed(2)}</b></span>
+                  <span>أعلى: <b className="text-emerald-400">${maxPrice.toFixed(4)}</b></span>
+                  <span>أدنى: <b className="text-rose-400">${minPrice.toFixed(4)}</b></span>
                 </div>
               </div>
 
@@ -231,13 +246,13 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
               <div className="flex items-center justify-between text-xs font-mono text-text-muted mb-2 border-b border-white/5 pb-1.5">
                 <div className="flex items-center gap-2">
                   <span className="text-amber-400 font-bold">🌊 مؤشر مذبذب إليوت (EWO: SMA5 - SMA35)</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/80">
-                    Median (High + Low) / 2
+                  <span className="text-[11px] px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-white">
+                    قيمة المؤشر الحالية: <b className={`font-bold ${e1 >= 0 ? 'text-emerald-400' : isYellow ? 'text-yellow-400' : 'text-rose-400'}`}>{e1 !== null && e1 !== undefined ? e1.toFixed(4) : '—'}</b>
                   </span>
                 </div>
                 {e1 !== null && (
                   <div className="flex items-center gap-3 text-[11px] font-mono">
-                    <span>E1 (الحالي): <b className={e1 >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{e1?.toFixed(4)}</b></span>
+                    <span>E1: <b className={e1 >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{e1?.toFixed(4)}</b></span>
                     <span>E2: <b className={e2 >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{e2?.toFixed(4)}</b></span>
                     <span>E3: <b className={e3 >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{e3?.toFixed(4)}</b></span>
                   </div>
@@ -293,12 +308,17 @@ export const SowaidDetailModal = ({ coin, onClose, isFavorite, onToggleFavorite 
               )}
 
               {/* Formula & Conditions Explanation */}
-              <div className="flex flex-wrap items-center justify-between text-[11px] font-mono text-text-muted mt-2 pt-2 border-t border-white/5">
-                <div>
-                  شرط الارتداد: <span className={isRebound ? 'text-emerald-400 font-bold' : 'text-text-muted'}>E1 &lt; 0 و E1 &gt; E2 و E2 &le; E3 {isRebound ? '✅' : '❌'}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] font-mono text-text-muted mt-2 pt-2 border-t border-white/5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className={`px-2 py-0.5 rounded ${isGreen ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold' : 'text-text-muted'}`}>
+                    🟢 صعود مؤكد: E1&lt;0 و E1&gt;E2 و E2&le;E3 {isGreen ? '✅' : '—'}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded ${isYellow ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 font-bold' : 'text-text-muted'}`}>
+                    🟡 استعداد: E1&le;E2 و |E1-E2| &lt; |E2-E3| {isYellow ? '✅' : '—'}
+                  </span>
                 </div>
                 <div>
-                  فلتر الترند [{activeTfSpecs.filter}]: <span className={filterOk ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{filterOk ? 'متوافق وصاعد ✅' : 'غير متوافق ❌'}</span>
+                  فلتر الترند [{activeTfSpecs.filter}]: <span className={filterOk ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{filterOk ? 'صاعد متوافق ✅' : 'غير متوافق ❌'}</span>
                 </div>
               </div>
             </div>

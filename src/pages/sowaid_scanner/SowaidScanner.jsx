@@ -166,29 +166,56 @@ export default function SowaidScanner() {
   const isScanningRef = useRef(false);
   const scannedSymbolsRef = useRef(new Set());
 
-  const runAnalysisForSymbols = useCallback((symbolsList) => {
+  const runAnalysisForSymbols = useCallback(async (symbolsList) => {
     if (!symbolsList || symbolsList.length === 0) return;
 
-    symbolsList.forEach((sym, idx) => {
+    const queue = [];
+    symbolsList.forEach((sym) => {
       const clean = cleanCoinSymbol(sym);
-      if (scannedSymbolsRef.current.has(clean)) return;
-      scannedSymbolsRef.current.add(clean);
-
-      setTimeout(() => {
-        analyzeCoinMultiTf(clean).then((res) => {
-          if (res) {
-            setMultiTfAnalysisMap((prev) => ({
-              ...prev,
-              [clean]: res
-            }));
-
-            if (soundEnabled && res.activeSignalsCount >= 4) {
-              playAlert('BULLISH');
-            }
-          }
-        });
-      }, idx * 400);
+      if (!scannedSymbolsRef.current.has(clean)) {
+        scannedSymbolsRef.current.add(clean);
+        queue.push(clean);
+      }
     });
+
+    if (queue.length === 0) return;
+
+    // فحص سريع على دفعات متوازية (Batching) يمنع قفزات الجدول ويسرع التحميل 5 أضعاف
+    const BATCH_SIZE = 4;
+    const allUpdates = {};
+    let hasBullishAlert = false;
+
+    for (let i = 0; i < queue.length; i += BATCH_SIZE) {
+      const chunk = queue.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(chunk.map((sym) => analyzeCoinMultiTf(sym)));
+
+      results.forEach((res, idx) => {
+        if (res) {
+          const sym = chunk[idx];
+          allUpdates[sym] = res;
+          if (soundEnabled && res.activeSignalsCount >= 4) {
+            hasBullishAlert = true;
+          }
+        }
+      });
+
+      // مهلة خفيفة جداً بين الدفعات لتفادي تجاوز معدل الطلبات
+      if (i + BATCH_SIZE < queue.length) {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    }
+
+    // تحديث الواجهة مرة واحدة فقط بعد الانتهاء من كامل القائمة لمنع القفزات
+    if (Object.keys(allUpdates).length > 0) {
+      setMultiTfAnalysisMap((prev) => ({
+        ...prev,
+        ...allUpdates
+      }));
+
+      if (hasBullishAlert) {
+        playAlert('BULLISH');
+      }
+    }
   }, [soundEnabled, playAlert]);
 
   // فحص الشموع الحقيقية للعملات المفضلة وأعلى العملات سيولة
@@ -203,16 +230,9 @@ export default function SowaidScanner() {
       ...uniqueMarketData.slice(0, 15).map(c => c.symbol)
     ];
 
-    runAnalysisForSymbols(priorityCoins);
-
-    const timer = setTimeout(() => {
+    runAnalysisForSymbols(priorityCoins).finally(() => {
       isScanningRef.current = false;
-    }, priorityCoins.length * 400 + 1000);
-
-    return () => {
-      clearTimeout(timer);
-      isScanningRef.current = false;
-    };
+    });
   }, [uniqueMarketData?.length, favorites, isPaused, runAnalysisForSymbols]);
 
   // فحص فوري عند كتابة اسم أي عملة في مربع البحث (مثل HYPE)
@@ -292,12 +312,14 @@ export default function SowaidScanner() {
     const sorted = [...filteredData].sort((a, b) => {
       const symA = cleanCoinSymbol(a.symbol);
       const symB = cleanCoinSymbol(b.symbol);
-      const signalsA = multiTfAnalysisMap[symA]?.activeSignalsCount || 0;
-      const signalsB = multiTfAnalysisMap[symB]?.activeSignalsCount || 0;
-      if (signalsA === signalsB) {
+      const itemA = multiTfAnalysisMap[symA];
+      const itemB = multiTfAnalysisMap[symB];
+      const scoreA = ((itemA?.activeSignalsCount || 0) * 10) + (itemA?.yellowSignalsCount || 0);
+      const scoreB = ((itemB?.activeSignalsCount || 0) * 10) + (itemB?.yellowSignalsCount || 0);
+      if (scoreA === scoreB) {
         return (b.quoteVolume || 0) - (a.quoteVolume || 0);
       }
-      return signalsB - signalsA;
+      return scoreB - scoreA;
     });
     return sorted.slice(0, 6);
   }, [filteredData, multiTfAnalysisMap]);

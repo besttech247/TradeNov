@@ -3,6 +3,7 @@
 export const SCANNER_NAME = 'SOWAID Scanner';
 export const SCANNER_VERSION = 'v4.0';
 
+
 export const TF_SPECS = {
   "1d": {
     label: "1 يوم (1D)",

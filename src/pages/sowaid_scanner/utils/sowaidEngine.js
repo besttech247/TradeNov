@@ -12,18 +12,38 @@ export function cleanCoinSymbol(symbol) {
     .toUpperCase();
 }
 
+// كاش خفيف للشموع لتسريع الفحص وتفادي إعادة تنزيل الشموع نفسها
+const klinesCache = new Map();
+const CACHE_TTL_MS = 25000; // 25 ثانية
+
 /**
- * جلب الشموع بشكل موحد مع دعم المنصات (بينانس ثم بايبيت تلقائياً)
- * يدعم العملات غير المدرجة في سبوت بينانس مثل HYPEUSDT
+ * جلب الشموع بشكل موحد وسريع مع دعم المنصات (بينانس ثم بايبيت تلقائياً)
+ * مزود بـ timeout سريع حتى لا يعلق الفحص في حال حجب أو بطء منصة
  */
 export async function fetchKlinesUniversal(symbol, binanceInterval, bybitInterval, limit = 60) {
   const cleanSym = cleanCoinSymbol(symbol);
+  const cacheKey = `${cleanSym}_${binanceInterval}_${limit}`;
+  const cached = klinesCache.get(cacheKey);
+  if (cached && (Date.now() - cached.time < CACHE_TTL_MS)) {
+    return cached.data;
+  }
 
-  // 1. تجربة منصة بينانس (Binance Spot)
-  try {
-    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${cleanSym}&interval=${binanceInterval}&limit=${limit}`);
-    if (res.ok) {
-      const data = await res.json();
+  const fetchWithTimeout = async (url, timeoutMs = 3000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
+  const binancePromise = fetchWithTimeout(`https://api.binance.com/api/v3/klines?symbol=${cleanSym}&interval=${binanceInterval}&limit=${limit}`, 3000)
+    .then(data => {
       if (Array.isArray(data) && data.length > 0 && !data.code) {
         return data.map(r => ({
           timestamp: r[0],
@@ -36,18 +56,12 @@ export async function fetchKlinesUniversal(symbol, binanceInterval, bybitInterva
           isGreen: parseFloat(r[4]) >= parseFloat(r[1])
         }));
       }
-    }
-  } catch (e) {
-    // تجاهل والتحويل لبايبيت
-  }
+      throw new Error('Invalid Binance data');
+    });
 
-  // 2. التحويل التلقائي لبايبيت (Bybit Linear Futures) مثل HYPEUSDT
-  try {
-    const res = await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${cleanSym}&interval=${bybitInterval}&limit=${limit}`);
-    if (res.ok) {
-      const data = await res.json();
+  const bybitPromise = fetchWithTimeout(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${cleanSym}&interval=${bybitInterval}&limit=${limit}`, 3000)
+    .then(data => {
       if (data?.result?.list && Array.isArray(data.result.list) && data.result.list.length > 0) {
-        // بيانات بايبيت تأتي من الأحدث إلى الأقدم، فنقلبها
         const raw = [...data.result.list].reverse();
         return raw.map(r => ({
           timestamp: parseInt(r[0]),
@@ -60,12 +74,17 @@ export async function fetchKlinesUniversal(symbol, binanceInterval, bybitInterva
           isGreen: parseFloat(r[4]) >= parseFloat(r[1])
         }));
       }
-    }
-  } catch (e) {
-    // خطأ شبكة
-  }
+      throw new Error('Invalid Bybit data');
+    });
 
-  return [];
+  try {
+    // يتسابق كلا المنصتين وأيهما يستجيب أولاً يتم اختياره، مما ينهي مشكلة التأخير للأبد
+    const formatted = await Promise.any([binancePromise, bybitPromise]);
+    klinesCache.set(cacheKey, { time: Date.now(), data: formatted });
+    return formatted;
+  } catch (e) {
+    return [];
+  }
 }
 
 /**
@@ -172,8 +191,36 @@ export function computeEWOArray(candles) {
 }
 
 /**
- * تقييم حالة إشارة الارتداد EWO بدقة تطابق back.py
- * sig_rebound = (e1 < 0) and (e1 > e2) and (e2 <= e3)
+ * فحص حصري لإشارات الصعود والاستعداد للصعود تحت الصفر
+ * e1: الشمعة الحالية المغلقة
+ * e2: الشمعة السابقة
+ * e3: الشمعة الأقدم
+ */
+export function checkReboundSignals(e1, e2, e3) {
+  if (e1 === null || e2 === null || e3 === null || e1 === undefined || e2 === undefined || e3 === undefined) {
+    return null;
+  }
+
+  // الفحص يعمل فقط تحت خط الصفر
+  if (e1 < 0) {
+    // 1. 🟢 إشارة الصعود المؤكدة (تنفيذ الشراء)
+    if (e1 > e2 && e2 <= e3) {
+      return "GREEN";
+    }
+
+    // 2. 🟡 إشارة الاستعداد للصعود (تباطؤ الهبوط تمهيداً للقاع)
+    const diff_curr = Math.abs(e1 - e2);
+    const diff_prev = Math.abs(e2 - e3);
+    if (e1 <= e2 && diff_curr < diff_prev) {
+      return "YELLOW";
+    }
+  }
+
+  return null; // لا توجد إشارة صعود أو استعداد
+}
+
+/**
+ * تقييم حالة إشارة الارتداد EWO بدقة
  */
 export function evaluateEWOState(ewoList) {
   if (!ewoList || ewoList.length < 3) {
@@ -181,6 +228,12 @@ export function evaluateEWOState(ewoList) {
       e1: null,
       e2: null,
       e3: null,
+      diffCurr: null,
+      diffPrev: null,
+      signalType: null,
+      isGreenSignal: false,
+      isYellowSignal: false,
+      isExactRebound: false,
       isRebound: false,
       isRising: false,
       isPositive: false,
@@ -195,37 +248,42 @@ export function evaluateEWOState(ewoList) {
   const e2 = ewoList[n - 2].ewo; // الشمعة السابقة
   const e3 = ewoList[n - 3].ewo; // شمعة قبلها
 
-  // 1. شرط الارتداد الدقيق من back.py
-  const isExactRebound = (e1 < 0) && (e1 > e2) && (e2 <= e3);
+  const diffCurr = Math.abs(e1 - e2);
+  const diffPrev = Math.abs(e2 - e3);
 
-  // 2. ارتداد صاعد نشط
-  const isActiveRebound = (e1 < 0) && (e1 > e2);
+  const signalType = checkReboundSignals(e1, e2, e3);
+  const isGreenSignal = signalType === "GREEN";
+  const isYellowSignal = signalType === "YELLOW";
 
-  // 3. اتجاه صاعد للـ EWO
   const isRising = e1 > e2;
-
-  // 4. منطقة إيجابية
   const isPositive = e1 > 0;
 
-  // الإشارة تعتبر فعالة إذا كانت ارتداداً متوافقاً أو صعوداً نشطاً
-  const isSignalValid = isExactRebound || (isActiveRebound && isRising) || (isPositive && isRising);
-
-  let statusText = '⏸ تصحيح هابط';
-  if (isExactRebound) statusText = '⚡ ارتداد ذهبي (دخول)';
-  else if (isActiveRebound) statusText = '⚡ موجة ارتداد صاعدة';
-  else if (isPositive && isRising) statusText = '🔥 صعود إيجابي قوي';
-  else if (isPositive) statusText = '🟢 عزم إيجابي EWO > 0';
+  let statusText = '⏸ لا توجد إشارة (مطفأ)';
+  if (isGreenSignal) {
+    statusText = '🟢 إشارة صعود مؤكدة (تنفيذ الشراء)';
+  } else if (isYellowSignal) {
+    statusText = '🟡 إشارة استعداد (تباطؤ الهبوط)';
+  } else if (isPositive && isRising) {
+    statusText = '🔥 صعود إيجابي فوق الصفر';
+  } else if (isPositive) {
+    statusText = ' عزم إيجابي فوق الصفر';
+  }
 
   return {
     e1,
     e2,
     e3,
-    isExactRebound,
-    isRebound: isExactRebound || isActiveRebound,
+    diffCurr,
+    diffPrev,
+    signalType,
+    isGreenSignal,
+    isYellowSignal,
+    isExactRebound: isGreenSignal,
+    isRebound: isGreenSignal,
     isRising,
     isPositive,
-    signalValid: isSignalValid,
-    isSignalValid,
+    signalValid: isGreenSignal,
+    isSignalValid: isGreenSignal,
     statusText,
     latestCandle: ewoList[n - 1].candle
   };
@@ -317,43 +375,66 @@ export async function analyzeCoinMultiTf(rawSymbol) {
       "1d": {
         ...state1d,
         filterOk: true,
-        signalValid: state1d.isSignalValid
+        rawSignal: state1d.isGreenSignal,
+        greenSignal: state1d.isGreenSignal,
+        signalValid: state1d.isGreenSignal,
+        yellowSignal: state1d.isYellowSignal
       },
       "4h": {
         ...state4h,
         filterOk: true,
-        signalValid: state4h.isSignalValid
+        rawSignal: state4h.isGreenSignal,
+        greenSignal: state4h.isGreenSignal,
+        signalValid: state4h.isGreenSignal,
+        yellowSignal: state4h.isYellowSignal
       },
       "81m": {
         ...state81m,
         filterOk: filter1dOk,
-        signalValid: state81m.isSignalValid && filter1dOk
+        rawSignal: state81m.isGreenSignal,
+        greenSignal: state81m.isGreenSignal && filter1dOk,
+        signalValid: state81m.isGreenSignal && filter1dOk,
+        yellowSignal: state81m.isYellowSignal
       },
       "27m": {
         ...state27m,
         filterOk: filter1dOk,
-        signalValid: state27m.isSignalValid && filter1dOk
+        rawSignal: state27m.isGreenSignal,
+        greenSignal: state27m.isGreenSignal && filter1dOk,
+        signalValid: state27m.isGreenSignal && filter1dOk,
+        yellowSignal: state27m.isYellowSignal
       },
       "9m": {
         ...state9m,
         filterOk: filter81mOk,
-        signalValid: state9m.isSignalValid && filter81mOk
+        rawSignal: state9m.isGreenSignal,
+        greenSignal: state9m.isGreenSignal && filter81mOk,
+        signalValid: state9m.isGreenSignal && filter81mOk,
+        yellowSignal: state9m.isYellowSignal
       },
       "3m": {
         ...state3m,
         filterOk: filter27mOk,
-        signalValid: state3m.isSignalValid
+        rawSignal: state3m.isGreenSignal,
+        greenSignal: state3m.isGreenSignal && filter27mOk,
+        signalValid: state3m.isGreenSignal && filter27mOk,
+        yellowSignal: state3m.isYellowSignal
       },
       "1m": {
         ...state1m,
         filterOk: filter9mOk,
-        signalValid: state1m.isSignalValid
+        rawSignal: state1m.isGreenSignal,
+        greenSignal: state1m.isGreenSignal && filter9mOk,
+        signalValid: state1m.isGreenSignal && filter9mOk,
+        yellowSignal: state1m.isYellowSignal
       }
     };
 
     let activeSignalsCount = 0;
+    let yellowSignalsCount = 0;
     for (const key of PRIORITY_ORDER) {
-      if (tfStatus[key]?.signalValid) activeSignalsCount++;
+      if (tfStatus[key]?.signalValid || tfStatus[key]?.greenSignal) activeSignalsCount++;
+      if (tfStatus[key]?.yellowSignal) yellowSignalsCount++;
     }
 
     const currentPrice = candles1m.length > 0
@@ -375,6 +456,7 @@ export async function analyzeCoinMultiTf(rawSymbol) {
       rawSymbol,
       currentPrice,
       activeSignalsCount,
+      yellowSignalsCount,
       tfStatus,
       tfCharts,
       filter1dOk,

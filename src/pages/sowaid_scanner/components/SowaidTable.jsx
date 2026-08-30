@@ -12,7 +12,8 @@ export const SowaidTable = ({
   setIsCollapsed
 }) => {
   // الترتيب الافتراضي: بحسب عدد الإشارات المتوافقة تنازلياً
-  const [sortField, setSortField] = useState('activeSignals');
+  // الترتيب الافتراضي حسب السيولة لضمان ثبات الجدول وعدم قفز الصفوف أثناء الفحص الأولي
+  const [sortField, setSortField] = useState('quoteVolume');
   const [sortAsc, setSortAsc] = useState(false);
 
   const handleSort = (field) => {
@@ -41,7 +42,7 @@ export const SowaidTable = ({
     return Array.from(map.values());
   }, [coins]);
 
-  // فرز القائمة بشكل مضمون ودقيق
+  // فرز القائمة بشكل مضمون ورصين يمنع القفزات
   const sortedCoins = useMemo(() => {
     return [...uniqueCoins].sort((a, b) => {
       const symA = cleanCoinSymbol(a.symbol);
@@ -51,8 +52,11 @@ export const SowaidTable = ({
       let bVal = 0;
 
       if (sortField === 'activeSignals') {
-        aVal = multiTfAnalysisMap[symA]?.activeSignalsCount || 0;
-        bVal = multiTfAnalysisMap[symB]?.activeSignalsCount || 0;
+        const itemA = multiTfAnalysisMap[symA];
+        const itemB = multiTfAnalysisMap[symB];
+        // وزن الإشارات: الصعود المؤكد (أخضر) = 10 نقاط، الاستعداد (أصفر) = 1 نقطة
+        aVal = ((itemA?.activeSignalsCount || 0) * 10) + (itemA?.yellowSignalsCount || 0);
+        bVal = ((itemB?.activeSignalsCount || 0) * 10) + (itemB?.yellowSignalsCount || 0);
       } else if (sortField === 'price') {
         aVal = a.price || 0;
         bVal = b.price || 0;
@@ -65,7 +69,7 @@ export const SowaidTable = ({
       }
 
       if (aVal === bVal) {
-        // عند التعادل نفرز بالسيولة
+        // عند التعادل نفرز بالسيولة كمعيار ثانوي ثابت
         return (b.quoteVolume || 0) - (a.quoteVolume || 0);
       }
 
@@ -206,11 +210,17 @@ export const SowaidTable = ({
                           activeCount >= 3
                             ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(52,211,153,0.4)]'
                             : activeCount > 0
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : (analysis?.yellowSignalsCount || 0) > 0
+                            ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
                             : 'bg-white/5 text-white/40 border border-white/5'
                         }`}
                       >
-                        {activeCount > 0 ? `⚡ ${activeCount}/7 إشارات` : '0 محايد'}
+                        {activeCount > 0
+                          ? `🟢 ${activeCount}/7 صعود`
+                          : (analysis?.yellowSignalsCount || 0) > 0
+                          ? `🟡 ${analysis.yellowSignalsCount}/7 استعداد`
+                          : '0 محايد'}
                       </span>
                     </td>
 
@@ -219,16 +229,19 @@ export const SowaidTable = ({
                       <div className="inline-flex items-center gap-0.5 bg-black/40 px-1.5 py-0.5 rounded-lg border border-white/5 font-mono text-[8px]">
                         {PRIORITY_ORDER.map((tf) => {
                           const status = analysis?.tfStatus?.[tf];
-                          const active = status?.signalValid || status?.isSignalValid;
+                          const isGreen = status?.greenSignal || status?.signalValid;
+                          const isYellow = status?.yellowSignal;
                           return (
                             <span
                               key={tf}
                               className={`px-1 py-0.5 rounded transition-all ${
-                                active
-                                  ? 'bg-emerald-500 text-black font-bold'
+                                isGreen
+                                  ? 'bg-emerald-500 text-black font-bold shadow-[0_0_6px_rgba(52,211,153,0.5)]'
+                                  : isYellow
+                                  ? 'bg-yellow-400 text-black font-bold shadow-[0_0_6px_rgba(250,204,21,0.5)]'
                                   : 'text-white/30'
                               }`}
-                              title={`${tf}: ${active ? 'إشارة ارتداد نشطة' : 'محايد'}`}
+                              title={`${tf}: ${isGreen ? '🟢 صعود مؤكد (تنفيذ الشراء)' : isYellow ? '🟡 إشارة استعداد (تباطؤ الهبوط)' : 'محايد'}`}
                             >
                               {tf}
                             </span>

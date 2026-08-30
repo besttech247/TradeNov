@@ -103,27 +103,36 @@ export const SowaidConfluenceGrid = ({
                 <div className="mb-3 bg-black/30 p-2 rounded-xl border border-white/5">
                   <div className="text-[10px] text-text-muted mb-1.5 flex items-center justify-between">
                     <span>رادار الفريمات الـ 7 (EWO):</span>
-                    <span className="text-amber-300 font-bold font-mono">
-                      {activeCount}/7 متوافقة
+                    <span className="font-bold font-mono">
+                      {activeCount > 0 ? (
+                        <span className="text-emerald-400">🟢 {activeCount}/7 صعود</span>
+                      ) : (analysis?.yellowSignalsCount || 0) > 0 ? (
+                        <span className="text-yellow-400">🟡 {analysis.yellowSignalsCount}/7 استعداد</span>
+                      ) : (
+                        <span className="text-white/40">0/7 محايد</span>
+                      )}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px]">
                     {PRIORITY_ORDER.map((tf) => {
                       const status = analysis?.tfStatus?.[tf];
-                      const isValid = status ? (status.signalValid || status.isSignalValid) : false;
+                      const isGreen = status ? (status.greenSignal || status.signalValid) : false;
+                      const isYellow = status?.yellowSignal;
                       return (
                         <div
                           key={tf}
                           className={`py-1 rounded-lg border transition-all ${
-                            isValid
+                            isGreen
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_8px_rgba(52,211,153,0.2)] font-bold'
+                              : isYellow
+                              ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 shadow-[0_0_8px_rgba(234,179,8,0.2)] font-bold'
                               : 'bg-white/5 text-white/30 border-white/5'
                           }`}
                         >
                           <div>{tf}</div>
                           <div className="text-[7px] opacity-80">
-                            {isValid ? '✅' : '—'}
+                            {isGreen ? '🟢' : isYellow ? '🟡' : '—'}
                           </div>
                         </div>
                       );
