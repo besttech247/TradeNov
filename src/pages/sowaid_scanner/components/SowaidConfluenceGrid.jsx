@@ -1,6 +1,6 @@
 import React from 'react';
 import { TF_SPECS, PRIORITY_ORDER } from '../utils/sowaidConstants';
-import { calculateSowaidTradeLevels } from '../utils/sowaidEngine';
+import { calculateSowaidTradeLevels, cleanCoinSymbol } from '../utils/sowaidEngine';
 
 export const SowaidConfluenceGrid = ({
   topCoins = [],

@@ -156,6 +156,7 @@ export function evaluateEWOState(ewoList) {
     isExactTurn,
     isRising,
     isSignalValid,
+    signalValid: isSignalValid,
     statusText,
     latestCandle: ewoList[n - 1].candle
   };
@@ -212,37 +213,37 @@ export function estimateCoinMultiTf(coin, btcChange = 0) {
 
   // 1D: صاعد إذا كان التغير إيجابي أو في النصف الأعلى من المدى
   const d1Valid = change > 0.5 || posInRange > 0.45;
-  tfStatus["1d"] = { signalValid: d1Valid, statusText: d1Valid ? '🔥 صاعد يومي' : '⏸ محايد', filterOk: true };
+  tfStatus["1d"] = { signalValid: d1Valid, isSignalValid: d1Valid, statusText: d1Valid ? '🔥 صاعد يومي' : '⏸ محايد', filterOk: true };
   if (d1Valid) activeCount++;
 
   // 4H: صاعد إذا كان السعر متماسك وفوق متوسط اليوم
   const h4Valid = change > 0 || posInRange > 0.40;
-  tfStatus["4h"] = { signalValid: h4Valid, statusText: h4Valid ? '🟢 إيجابي 4H' : '⏸ محايد', filterOk: true };
+  tfStatus["4h"] = { signalValid: h4Valid, isSignalValid: h4Valid, statusText: h4Valid ? '🟢 إيجابي 4H' : '⏸ محايد', filterOk: true };
   if (h4Valid) activeCount++;
 
   // 81m: ارتداد أو زخم مدعوم بالسيولة
   const m81Valid = (posInRange > 0.35 && isAlphaBtc) || isHighVolume || change > 1.5;
-  tfStatus["81m"] = { signalValid: m81Valid, statusText: m81Valid ? '⚡ ارتداد 81m' : '⏸ محايد', filterOk: d1Valid };
+  tfStatus["81m"] = { signalValid: m81Valid, isSignalValid: m81Valid, statusText: m81Valid ? '⚡ ارتداد 81m' : '⏸ محايد', filterOk: d1Valid };
   if (m81Valid) activeCount++;
 
   // 27m: زخم تداول نشط
   const m27Valid = posInRange > 0.30 || change > 1.0 || isHighVolume;
-  tfStatus["27m"] = { signalValid: m27Valid, statusText: m27Valid ? '⚡ ارتداد 27m' : '⏸ محايد', filterOk: d1Valid };
+  tfStatus["27m"] = { signalValid: m27Valid, isSignalValid: m27Valid, statusText: m27Valid ? '⚡ ارتداد 27m' : '⏸ محايد', filterOk: d1Valid };
   if (m27Valid) activeCount++;
 
   // 9m: انطلاق أو ارتداد لحظي
   const m9Valid = posInRange > 0.35 || change > 0.2 || isUltraVolume;
-  tfStatus["9m"] = { signalValid: m9Valid, statusText: m9Valid ? '⚡ ارتداد 9m' : '⏸ محايد', filterOk: m81Valid };
+  tfStatus["9m"] = { signalValid: m9Valid, isSignalValid: m9Valid, statusText: m9Valid ? '⚡ ارتداد 9m' : '⏸ محايد', filterOk: m81Valid };
   if (m9Valid) activeCount++;
 
   // 3m: مضاربة سريعة
   const m3Valid = change > -3.0 || posInRange > 0.30;
-  tfStatus["3m"] = { signalValid: m3Valid, statusText: m3Valid ? '🚀 زخم 3m' : '⏸ محايد', filterOk: true };
+  tfStatus["3m"] = { signalValid: m3Valid, isSignalValid: m3Valid, statusText: m3Valid ? '🚀 زخم 3m' : '⏸ محايد', filterOk: true };
   if (m3Valid) activeCount++;
 
   // 1m: مضاربة لحظية
   const m1Valid = change > -5.0 && posInRange > 0.25;
-  tfStatus["1m"] = { signalValid: m1Valid, statusText: m1Valid ? '🚀 زخم 1m' : '⏸ محايد', filterOk: true };
+  tfStatus["1m"] = { signalValid: m1Valid, isSignalValid: m1Valid, statusText: m1Valid ? '🚀 زخم 1m' : '⏸ محايد', filterOk: true };
   if (m1Valid) activeCount++;
 
   return {
