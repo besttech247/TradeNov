@@ -8,6 +8,7 @@ import ProApp from './pages/pro/ProApp';
 import AgentApp from './pages/agent/AgentApp';
 import TradeNovScanner from './pages/scanner/TradeNovScanner';
 import SowaidScanner from './pages/sowaid_scanner/SowaidScanner';
+import TradeNovInfo from './pages/info/TradeNovInfo';
 
 const Hub = () => (
   <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-8 text-center relative overflow-hidden bg-background">
@@ -60,14 +61,19 @@ const Hub = () => (
     </div>
 
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl w-full">
-      {/* 4. New Option 3 (Placeholder) */}
-      <Link to="#" className="glass-panel p-4 hover:border-rose-500/40 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 opacity-80 hover:opacity-100">
-        <div className="text-right flex-1">
-          <h2 className="text-sm font-bold text-white">خيار جديد 3</h2>
-          <p className="text-[10px] text-text-muted">مساحة للإضافة مستقبلاً</p>
+      {/* 4. TradeNov INFO */}
+      <Link to="/info" className="glass-panel p-4 hover:border-cyan-500/60 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 relative overflow-hidden">
+        <div className="absolute top-1 left-2">
+          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+            v1.0.0
+          </span>
         </div>
-        <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform">
-          <span className="text-xl">🛡️</span>
+        <div className="text-right flex-1">
+          <h2 className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">TradeNov INFO</h2>
+          <p className="text-[10px] text-text-muted">التحليل الأساسي ومعدلات الفائدة ومصفوفة المؤشرات الفنية</p>
+        </div>
+        <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+          <span className="text-xl">🌐</span>
         </div>
       </Link>
 
@@ -133,6 +139,7 @@ export default function App() {
         <Route path="/scanner/*" element={<TradeNovScanner />} />
         <Route path="/sowaid-scanner/*" element={<SowaidScanner />} />
         <Route path="/scanner-v4/*" element={<SowaidScanner />} />
+        <Route path="/info/*" element={<TradeNovInfo />} />
         <Route path="/dev/api-hub" element={<ApiHub />} />
       </Routes>
     </BrowserRouter>
