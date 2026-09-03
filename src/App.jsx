@@ -9,6 +9,7 @@ import AgentApp from './pages/agent/AgentApp';
 import TradeNovScanner from './pages/scanner/TradeNovScanner';
 import SowaidScanner from './pages/sowaid_scanner/SowaidScanner';
 import TradeNovInfo from './pages/info/TradeNovInfo';
+import CryptoRadarApp from './pages/radar/CryptoRadarApp';
 
 const Hub = () => (
   <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-8 text-center relative overflow-hidden bg-background">
@@ -52,7 +53,7 @@ const Hub = () => (
       </Link>
     </div>
 
-    {/* Secondary Menu (API Hub + 3 New Options) */}
+    {/* Secondary Menu (API Hub + New Options) */}
     <div className="w-full max-w-5xl text-right mb-6">
       <h3 className="text-xl font-bold text-white/80 border-b border-white/10 pb-3 flex items-center justify-end gap-2">
         <span className="w-2 h-2 rounded-full bg-white/20"></span>
@@ -60,7 +61,23 @@ const Hub = () => (
       </h3>
     </div>
 
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl w-full">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 max-w-5xl w-full">
+      {/* 5. Crypto Radar v3.5 */}
+      <Link to="/radar" className="glass-panel p-4 hover:border-cyan-400/60 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 relative overflow-hidden">
+        <div className="absolute top-1 left-2">
+          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 text-cyan-300 border border-cyan-500/30">
+            v3.5 Bybit
+          </span>
+        </div>
+        <div className="text-right flex-1">
+          <h2 className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">Crypto Radar v3.5</h2>
+          <p className="text-[10px] text-text-muted">رادار المضاربة اللحظية وتدفق السيولة وعمق الأوامر (CVD)</p>
+        </div>
+        <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+          <span className="text-xl">🎯</span>
+        </div>
+      </Link>
+
       {/* 4. TradeNov INFO */}
       <Link to="/info" className="glass-panel p-4 hover:border-cyan-500/60 transition-all cursor-pointer group flex items-center justify-end gap-4 bg-white/5 relative overflow-hidden">
         <div className="absolute top-1 left-2">
@@ -139,6 +156,7 @@ export default function App() {
         <Route path="/scanner/*" element={<TradeNovScanner />} />
         <Route path="/sowaid-scanner/*" element={<SowaidScanner />} />
         <Route path="/scanner-v4/*" element={<SowaidScanner />} />
+        <Route path="/radar/*" element={<CryptoRadarApp />} />
         <Route path="/info/*" element={<TradeNovInfo />} />
         <Route path="/dev/api-hub" element={<ApiHub />} />
       </Routes>
