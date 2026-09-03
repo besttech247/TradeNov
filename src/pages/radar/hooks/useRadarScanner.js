@@ -50,6 +50,7 @@ export function useRadarScanner() {
   const booksRef = useRef({});
   const symbolsRef = useRef([]);
   const wsRef = useRef(null);
+  const pingIntervalRef = useRef(null);
   const intervalRef = useRef(null);
   const isRunningRef = useRef(true);
   const selectedExchangeRef = useRef(selectedExchange);
@@ -117,7 +118,6 @@ export function useRadarScanner() {
           };
         }
       } else {
-        // Binance returns raw array of arrays
         if (Array.isArray(data) && data.length > 0) {
           return {
             symbol,
@@ -125,23 +125,20 @@ export function useRadarScanner() {
           };
         }
       }
-    } catch (e) {
-      // Ignore individual fetch failure
-    }
+    } catch (e) {}
     return null;
   };
 
   // Bootstrap top markets and klines
   const bootstrapMarkets = async (exchange = selectedExchangeRef.current, limitToFetch = scanLimit) => {
     setStatus('BOOTSTRAP');
-    const exMeta = EXCHANGES[exchange] || EXCHANGES.BYBIT;
+    const exMeta = EXCHANGES[exchange] || EXCHANGES.BINANCE_FUTURES;
     addLog(`🚀 جاري فحص أسواق [${exMeta.name}] (أعلى ${limitToFetch} زوج سيولة)...`);
 
     try {
       let selected = [];
 
       if (exchange === 'BYBIT') {
-        // 1. Bybit Instruments Info
         const infoResp = await fetch(
           `${BYBIT_REST_URL}/v5/market/instruments-info?category=linear&status=Trading&limit=1000`
         );
@@ -150,7 +147,6 @@ export function useRadarScanner() {
           .filter(x => x.status === 'Trading' && x.quoteCoin === 'USDT' && x.settleCoin === 'USDT' && x.contractType === 'LinearPerpetual')
           .map(x => x.symbol);
 
-        // 2. Bybit 24h Tickers
         const tickResp = await fetch(`${BYBIT_REST_URL}/v5/market/tickers?category=linear`);
         const tickData = await tickResp.json();
         const tickerMap = {};
@@ -163,14 +159,12 @@ export function useRadarScanner() {
           .slice(0, limitToFetch);
 
       } else if (exchange === 'BINANCE_FUTURES') {
-        // 1. Binance Futures Exchange Info
         const infoResp = await fetch(`${BINANCE_FUTURES_REST_URL}/fapi/v1/exchangeInfo`);
         const infoData = await infoResp.json();
         const validSymbols = (infoData.symbols || [])
           .filter(x => x.status === 'TRADING' && x.quoteAsset === 'USDT' && x.contractType === 'PERPETUAL')
           .map(x => x.symbol);
 
-        // 2. 24h Tickers for Quote Volume sorting
         const tickResp = await fetch(`${BINANCE_FUTURES_REST_URL}/fapi/v1/ticker/24hr`);
         const tickData = await tickResp.json();
         const tickerMap = {};
@@ -183,7 +177,6 @@ export function useRadarScanner() {
           .slice(0, limitToFetch);
 
       } else {
-        // Binance Spot
         const infoResp = await fetch(`${BINANCE_SPOT_REST_URL}/api/v3/exchangeInfo`);
         const infoData = await infoResp.json();
         const validSymbols = (infoData.symbols || [])
@@ -208,9 +201,8 @@ export function useRadarScanner() {
 
       symbolsRef.current = selected;
       setMarketCount(selected.length);
-      addLog(`✅ تم تحديد ${selected.length} زوج عملة للتتبع اللحظي على [${exMeta.shortName}]. جاري تحميل الشموع (5M)...`);
+      addLog(`✅ تم تحديد ${selected.length} زوج عملة على [${exMeta.shortName}]. جاري تحميل الشموع (5M)...`);
 
-      // Batch fetch klines with concurrency limit
       const chunkSize = 12;
       const newSnapshots = {};
 
@@ -227,9 +219,8 @@ export function useRadarScanner() {
       tradesRef.current = {};
       booksRef.current = {};
 
-      addLog(`✨ تم تحميل بيانات الشموع بنجاح لـ ${Object.keys(newSnapshots).length} زوج!`);
+      addLog(`✨ تم تحميل بيانات الشموع بنجاح لـ ${Object.keys(newSnapshots).length} زوج! جاري تشغيل الـ WebSocket والحسابات...`);
 
-      // Initial analysis
       runAnalysisPass();
       setStatus('LIVE');
       initWebSocket(selected, exchange);
@@ -289,6 +280,9 @@ export function useRadarScanner() {
     if (wsRef.current) {
       try { wsRef.current.close(); } catch {}
     }
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+    }
 
     if (exchange === 'BYBIT') {
       const ws = new WebSocket(BYBIT_WS_URL);
@@ -296,7 +290,7 @@ export function useRadarScanner() {
 
       ws.onopen = () => {
         setStatus('LIVE');
-        addLog('⚡ تم الاتصال المباشر بمجرى Bybit WebSocket.');
+        addLog(`⚡ تم الاتصال المباشر بـ Bybit WebSocket (${symbols.length} زوج).`);
         const topics = [];
         symbols.forEach(s => {
           topics.push(`publicTrade.${s}`);
@@ -371,40 +365,56 @@ export function useRadarScanner() {
       };
 
     } else {
-      // Binance (Futures or Spot) Multi-Stream WebSocket
-      // Top 30 most active symbols subscribed via stream
-      const topSymbols = symbols.slice(0, 40);
-      const streamList = [];
-      topSymbols.forEach(s => {
-        const lower = s.toLowerCase();
-        streamList.push(`${lower}@aggTrade`);
-        streamList.push(`${lower}@bookTicker`);
-      });
+      // Binance (Futures or Spot)
+      const wsUrl = exchange === 'BINANCE_FUTURES'
+        ? BINANCE_FUTURES_WS_URL
+        : BINANCE_SPOT_WS_URL;
 
-      const baseUrl = exchange === 'BINANCE_FUTURES'
-        ? 'wss://fstream.binance.com/stream?streams='
-        : 'wss://stream.binance.com:9443/stream?streams=';
-
-      const ws = new WebSocket(baseUrl + streamList.join('/'));
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setStatus('LIVE');
-        addLog(`⚡ تم الاتصال المباشر بمجرى Binance WebSocket (${topSymbols.length} زوج).`);
+        addLog(`⚡ تم الاتصال المباشر بـ Binance WebSocket (${symbols.length} زوج).`);
+
+        // Send JSON SUBSCRIBE requests for aggTrade and bookTicker in batches of 20
+        const streams = [];
+        symbols.forEach(s => {
+          const lower = s.toLowerCase();
+          streams.push(`${lower}@aggTrade`);
+          streams.push(`${lower}@bookTicker`);
+        });
+
+        const batchSize = 20;
+        let idCounter = 1;
+        for (let i = 0; i < streams.length; i += batchSize) {
+          const batch = streams.slice(i, i + batchSize);
+          ws.send(JSON.stringify({
+            method: 'SUBSCRIBE',
+            params: batch,
+            id: idCounter++
+          }));
+        }
+
+        // Keepalive ping every 3 minutes
+        pingIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ method: 'ping' }));
+          }
+        }, 180000);
       };
 
       ws.onmessage = (event) => {
         if (!isRunningRef.current) return;
         try {
-          const payload = JSON.parse(event.data);
-          const data = payload.data || payload;
-          const streamName = payload.stream || '';
+          const data = JSON.parse(event.data);
+          const eventType = data.e;
 
-          if (streamName.endsWith('@aggTrade') || data.e === 'aggTrade') {
+          if (eventType === 'aggTrade') {
             const sym = data.s;
             const price = parseFloat(data.p);
             const vol = parseFloat(data.q);
-            // In Binance aggTrade, m is "is the buyer the market maker" -> if m is false, the buyer is taker (Aggressive Buy)
+            // If data.m (market maker) is false -> Buyer is taker (Aggressive Buy)
             const isBuy = !data.m;
 
             if (!tradesRef.current[sym]) tradesRef.current[sym] = [];
@@ -418,7 +428,7 @@ export function useRadarScanner() {
               tradesRef.current[sym] = tradesRef.current[sym].slice(-500);
             }
 
-          } else if (streamName.endsWith('@bookTicker') || data.e === 'bookTicker' || data.u) {
+          } else if (eventType === 'bookTicker' || (data.b && data.a && data.s)) {
             const sym = data.s;
             const bid = parseFloat(data.b || 0);
             const ask = parseFloat(data.a || 0);
@@ -527,6 +537,7 @@ export function useRadarScanner() {
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (wsRef.current) {
         try { wsRef.current.close(); } catch {}
       }

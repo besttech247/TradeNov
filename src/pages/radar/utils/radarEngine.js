@@ -4,18 +4,18 @@
  */
 
 export const EXCHANGES = {
-  BYBIT: {
-    id: 'BYBIT',
-    name: 'Bybit Linear',
-    shortName: 'Bybit',
-    badgeColor: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10',
-    type: 'Futures'
-  },
   BINANCE_FUTURES: {
     id: 'BINANCE_FUTURES',
     name: 'Binance Futures (USDT-M)',
     shortName: 'Binance (F)',
     badgeColor: 'text-amber-400 border-amber-500/30 bg-amber-500/10',
+    type: 'Futures'
+  },
+  BYBIT: {
+    id: 'BYBIT',
+    name: 'Bybit Linear',
+    shortName: 'Bybit',
+    badgeColor: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10',
     type: 'Futures'
   },
   BINANCE_SPOT: {
@@ -131,7 +131,7 @@ export function calculateVWAP(klines, n = 50) {
  * Analyzes market snapshot, order book, and recent trades flow.
  * Returns technical scores, signals, order flow imbalance, and targets.
  */
-export function analyzeMarket(snapshot, tradesMap = {}, booksMap = {}, exchangeId = 'BYBIT') {
+export function analyzeMarket(snapshot, tradesMap = {}, booksMap = {}, exchangeId = 'BINANCE_FUTURES') {
   const klines = snapshot.klines || [];
   if (klines.length < 50) return null;
 
@@ -230,11 +230,47 @@ export function analyzeMarket(snapshot, tradesMap = {}, booksMap = {}, exchangeI
   // 7. Microstructure: Aggressive Trades & CVD (Cumulative Volume Delta)
   const now = Date.now() / 1000;
   const symbolTrades = (tradesMap[snapshot.symbol] || []).filter(t => t.ts >= now - 60);
-  const buyQuote = symbolTrades.filter(t => t.buy).reduce((acc, t) => acc + t.quote, 0);
-  const sellQuote = symbolTrades.filter(t => !t.buy).reduce((acc, t) => acc + t.quote, 0);
-  const totalFlow = buyQuote + sellQuote;
-  const buyRatio = totalFlow > 0 ? buyQuote / totalFlow : 0.5;
-  const cvd = buyQuote - sellQuote;
+  
+  let buyQuote = 0;
+  let sellQuote = 0;
+  let totalFlow = 0;
+  let buyRatio = 0.5;
+  let cvd = 0;
+
+  if (symbolTrades.length > 0) {
+    // Real-time live sliding window trades from WebSocket
+    buyQuote = symbolTrades.filter(t => t.buy).reduce((acc, t) => acc + t.quote, 0);
+    sellQuote = symbolTrades.filter(t => !t.buy).reduce((acc, t) => acc + t.quote, 0);
+    totalFlow = buyQuote + sellQuote;
+    buyRatio = totalFlow > 0 ? buyQuote / totalFlow : 0.5;
+    cvd = buyQuote - sellQuote;
+  } else {
+    // Initial fallback to current 5M candle taker volume (Binance klines format)
+    const latestKline = klines[klines.length - 1];
+    if (latestKline && latestKline[10] !== undefined && latestKline[7] !== undefined) {
+      const takerBuy = parseFloat(latestKline[10]) || 0;
+      const totalVol = parseFloat(latestKline[7]) || 0;
+      const takerSell = Math.max(0, totalVol - takerBuy);
+      buyQuote = takerBuy;
+      sellQuote = takerSell;
+      totalFlow = totalVol;
+      buyRatio = totalVol > 0 ? takerBuy / totalVol : 0.5;
+      cvd = takerBuy - takerSell;
+    } else {
+      // Bybit fallback based on 5m candle body direction & volume
+      const open = parseFloat(latestKline[1]);
+      const close = parseFloat(latestKline[4]);
+      const volQuote = parseFloat(latestKline[5]) * close;
+      totalFlow = volQuote;
+      if (close > open) {
+        buyRatio = 0.60;
+        cvd = volQuote * 0.20;
+      } else if (close < open) {
+        buyRatio = 0.40;
+        cvd = -volQuote * 0.20;
+      }
+    }
+  }
 
   if (totalFlow > 0) {
     if (buyRatio >= 0.62) {
@@ -297,7 +333,7 @@ export function analyzeMarket(snapshot, tradesMap = {}, booksMap = {}, exchangeI
     buy_ratio: buyRatio,
     cvd,
     flow_quote: totalFlow,
-    trade_velocity: symbolTrades.length / 60,
+    trade_velocity: symbolTrades.length > 0 ? symbolTrades.length / 60 : (totalFlow > 0 ? 1.5 : 0),
     book_imbalance: bookImbalance,
     spread_pct: book.spread_pct || 0,
     entry,
