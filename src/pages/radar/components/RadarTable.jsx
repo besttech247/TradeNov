@@ -16,6 +16,15 @@ export function RadarTable({
     return Number(val).toFixed(decimals);
   };
 
+  const formatCVD = (val) => {
+    if (val === undefined || val === null || isNaN(val) || Math.abs(val) < 0.01) return '$0';
+    const sign = val > 0 ? '+' : '-';
+    const absVal = Math.abs(val);
+    if (absVal >= 1000000) return `${sign}$${(absVal / 1000000).toFixed(2)}M`;
+    if (absVal >= 1000) return `${sign}$${(absVal / 1000).toFixed(1)}K`;
+    return `${sign}$${absVal.toFixed(0)}`;
+  };
+
   const getScoreColor = (score) => {
     if (score >= 78) return 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]';
     if (score >= 62) return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
@@ -72,7 +81,7 @@ export function RadarTable({
       </div>
 
       <div className="overflow-x-auto max-h-[580px] scrollbar-thin scrollbar-thumb-white/10">
-        <table className="w-full text-right border-collapse min-w-[1050px]">
+        <table className="w-full text-right border-collapse min-w-[1080px]">
           <thead className="bg-black/50 sticky top-0 z-10 text-[11px] text-text-muted font-bold border-b border-white/10">
             <tr>
               <th className="py-3 px-4">الزوج (Symbol)</th>
@@ -82,8 +91,8 @@ export function RadarTable({
               <th className="py-3 px-3 text-center">تغير 5M</th>
               <th className="py-3 px-3 text-center">RSI (14)</th>
               <th className="py-3 px-3 text-center">RVOL</th>
-              <th className="py-3 px-3 text-center">تدفق الشراء</th>
-              <th className="py-3 px-3 text-center">CVD</th>
+              <th className="py-3 px-3 text-center">تدفق الشراء (Buy Flow)</th>
+              <th className="py-3 px-3 text-center">مؤشر CVD</th>
               <th className="py-3 px-3 text-center">عمق الأوامر</th>
               <th className="py-3 px-3 text-center">السبريد</th>
               <th className="py-3 px-3 text-left">الدخول (Entry)</th>
@@ -158,20 +167,34 @@ export function RadarTable({
                       {item.rvol.toFixed(2)}x
                     </td>
 
-                    {/* Buy Flow % */}
+                    {/* Buy Flow % with Progress Bar */}
                     <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <span className={`font-bold ${buyPct >= 60 ? 'text-emerald-400' : buyPct <= 40 ? 'text-rose-400' : 'text-text-muted'}`}>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`text-xs font-bold ${
+                          buyPct >= 60 ? 'text-emerald-400' : buyPct <= 40 ? 'text-rose-400' : 'text-text-muted'
+                        }`}>
                           {buyPct.toFixed(0)}%
                         </span>
+                        <div className="w-12 h-1 bg-rose-500/40 rounded-full overflow-hidden flex">
+                          <div
+                            className="h-full bg-emerald-400 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(100, Math.max(0, buyPct))}%` }}
+                          />
+                        </div>
                       </div>
                     </td>
 
-                    {/* CVD */}
-                    <td className={`py-3 px-3 text-center font-medium ${
-                      item.cvd > 0 ? 'text-emerald-400' : item.cvd < 0 ? 'text-rose-400' : 'text-text-muted'
-                    }`}>
-                      {item.cvd > 0 ? '+' : ''}{formatNum(item.cvd, 0)}
+                    {/* CVD with Badge */}
+                    <td className="py-3 px-3 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-bold font-mono border ${
+                        item.cvd > 0
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 shadow-[0_0_6px_rgba(16,185,129,0.15)]'
+                          : item.cvd < 0
+                          ? 'bg-rose-500/15 text-rose-300 border-rose-500/30 shadow-[0_0_6px_rgba(244,63,94,0.15)]'
+                          : 'bg-white/5 text-text-muted border-white/10'
+                      }`}>
+                        {formatCVD(item.cvd)}
+                      </span>
                     </td>
 
                     {/* Book Imbalance */}

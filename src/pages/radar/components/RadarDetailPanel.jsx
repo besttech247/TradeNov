@@ -17,9 +17,20 @@ export function RadarDetailPanel({ item, selectedExchange }) {
     return Number(val).toFixed(decimals);
   };
 
+  const formatCVD = (val) => {
+    if (val === undefined || val === null || isNaN(val) || Math.abs(val) < 0.01) return '$0';
+    const sign = val > 0 ? '+' : '-';
+    const absVal = Math.abs(val);
+    if (absVal >= 1000000) return `${sign}$${(absVal / 1000000).toFixed(2)}M`;
+    if (absVal >= 1000) return `${sign}$${(absVal / 1000).toFixed(1)}K`;
+    return `${sign}$${absVal.toFixed(0)}`;
+  };
+
   const isLong = item.direction === 'LONG';
   const rawSymbol = item.symbol.replace('USDT', '');
   const exMeta = EXCHANGES[selectedExchange] || EXCHANGES.BINANCE_FUTURES;
+  const buyPct = (item.buy_ratio * 100);
+  const sellPct = Math.max(0, 100 - buyPct);
 
   const getExchangeLiveLink = () => {
     if (selectedExchange === 'BYBIT') {
@@ -116,7 +127,7 @@ export function RadarDetailPanel({ item, selectedExchange }) {
           </div>
 
           <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/10 flex items-center justify-between text-xs font-mono">
-            <span className="text-text-muted">نسبة المخاطرة التقريبية (ATR %):</span>
+            <span className="text-text-muted">نسبة المخاطرة الحقيقية (ATR %):</span>
             <span className="font-bold text-cyan-300">
               {item.atr_pct ? item.atr_pct.toFixed(2) : '--'}%
             </span>
@@ -127,39 +138,45 @@ export function RadarDetailPanel({ item, selectedExchange }) {
         <div className="flex flex-col gap-3">
           <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-            عمق السيولة وتدفق الطلبات (Order Flow)
+            عمق السيولة ومؤشر CVD (Order Flow)
           </h4>
 
-          <div className="grid grid-cols-2 gap-2.5 font-mono text-xs">
-            <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col">
-              <span className="text-[10px] text-text-muted">نسبة الشراء العدواني (BUY FLOW)</span>
-              <span className="text-xs font-bold text-white mt-1">{(item.buy_ratio * 100).toFixed(1)}%</span>
+          {/* Live Buy vs Sell Flow Gauge */}
+          <div className="p-3 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs font-mono font-bold">
+              <span className="text-emerald-400">شراء ماركت: {buyPct.toFixed(1)}%</span>
+              <span className="text-rose-400">بيع ماركت: {sellPct.toFixed(1)}%</span>
             </div>
+            <div className="w-full h-2 bg-rose-500 rounded-full overflow-hidden flex">
+              <div
+                className="h-full bg-emerald-400 transition-all duration-300"
+                style={{ width: `${Math.min(100, Math.max(0, buyPct))}%` }}
+              />
+            </div>
+          </div>
 
+          <div className="grid grid-cols-2 gap-2 font-mono text-xs">
             <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col">
-              <span className="text-[10px] text-text-muted">صافي حجم التراكم (CVD 60s)</span>
-              <span className={`text-xs font-bold mt-1 ${item.cvd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {item.cvd >= 0 ? '+' : ''}{formatNum(item.cvd, 0)}
+              <span className="text-[10px] text-text-muted">صافي تراكم CVD</span>
+              <span className={`text-xs font-black mt-1 ${item.cvd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {formatCVD(item.cvd)}
               </span>
             </div>
 
             <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col">
-              <span className="text-[10px] text-text-muted">عدم توازن الدفتر (BOOK IMB)</span>
-              <span className="text-xs font-bold text-white mt-1">{(item.book_imbalance * 100).toFixed(1)}%</span>
+              <span className="text-[10px] text-text-muted">عدم توازن الدفتر</span>
+              <span className={`text-xs font-bold mt-1 ${item.book_imbalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {item.book_imbalance > 0 ? '+' : ''}{(item.book_imbalance * 100).toFixed(1)}%
+              </span>
             </div>
 
             <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col">
-              <span className="text-[10px] text-text-muted">نسبة السبريد (SPREAD %)</span>
+              <span className="text-[10px] text-text-muted">نسبة السبريد</span>
               <span className="text-xs font-bold text-text-muted mt-1">{item.spread_pct.toFixed(4)}%</span>
             </div>
 
             <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col">
-              <span className="text-[10px] text-text-muted">حجم الصفقات (1M FLOW)</span>
-              <span className="text-xs font-bold text-white mt-1">${formatNum(item.flow_quote, 0)}</span>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col">
-              <span className="text-[10px] text-text-muted">سرعة الصفقات (VELOCITY)</span>
+              <span className="text-[10px] text-text-muted">سرعة الصفقات</span>
               <span className="text-xs font-bold text-cyan-300 mt-1">{item.trade_velocity.toFixed(1)} صفقة/ث</span>
             </div>
           </div>
