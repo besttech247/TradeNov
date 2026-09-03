@@ -1,10 +1,40 @@
 /**
  * Crypto Intraday Radar V3.5 Analytical Engine
- * Exact algorithmic port of backend.py with high performance optimizations for browser execution.
+ * Multi-Exchange Architecture supporting Bybit, Binance Futures, and Binance Spot.
  */
+
+export const EXCHANGES = {
+  BYBIT: {
+    id: 'BYBIT',
+    name: 'Bybit Linear',
+    shortName: 'Bybit',
+    badgeColor: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10',
+    type: 'Futures'
+  },
+  BINANCE_FUTURES: {
+    id: 'BINANCE_FUTURES',
+    name: 'Binance Futures (USDT-M)',
+    shortName: 'Binance (F)',
+    badgeColor: 'text-amber-400 border-amber-500/30 bg-amber-500/10',
+    type: 'Futures'
+  },
+  BINANCE_SPOT: {
+    id: 'BINANCE_SPOT',
+    name: 'Binance Spot',
+    shortName: 'Binance (S)',
+    badgeColor: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
+    type: 'Spot'
+  }
+};
 
 export const BYBIT_REST_URL = 'https://api.bybit.com';
 export const BYBIT_WS_URL = 'wss://stream.bybit.com/v5/public/linear';
+
+export const BINANCE_FUTURES_REST_URL = 'https://fapi.binance.com';
+export const BINANCE_FUTURES_WS_URL = 'wss://fstream.binance.com/ws';
+
+export const BINANCE_SPOT_REST_URL = 'https://api.binance.com';
+export const BINANCE_SPOT_WS_URL = 'wss://stream.binance.com:9443/ws';
 
 /**
  * Calculates Exponential Moving Average (EMA)
@@ -101,7 +131,7 @@ export function calculateVWAP(klines, n = 50) {
  * Analyzes market snapshot, order book, and recent trades flow.
  * Returns technical scores, signals, order flow imbalance, and targets.
  */
-export function analyzeMarket(snapshot, tradesMap = {}, booksMap = {}) {
+export function analyzeMarket(snapshot, tradesMap = {}, booksMap = {}, exchangeId = 'BYBIT') {
   const klines = snapshot.klines || [];
   if (klines.length < 50) return null;
 
@@ -254,6 +284,7 @@ export function analyzeMarket(snapshot, tradesMap = {}, booksMap = {}) {
 
   return {
     symbol: snapshot.symbol,
+    exchange: exchangeId,
     price: currentPrice,
     score,
     signal,

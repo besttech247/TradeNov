@@ -1,12 +1,16 @@
 import React from 'react';
+import { EXCHANGES } from '../utils/radarEngine';
 
 export function RadarStatsBar({
+  selectedExchange,
   regime,
   marketCount,
   topItem,
   lastUpdated,
   totalFoundCount
 }) {
+  const exMeta = EXCHANGES[selectedExchange] || EXCHANGES.BINANCE_FUTURES;
+
   const getRegimeColor = () => {
     switch (regime) {
       case 'BULLISH':
@@ -44,7 +48,7 @@ export function RadarStatsBar({
 
       {/* 2. Monitored Markets */}
       <div className="p-3.5 rounded-2xl bg-background-light/40 border border-white/10 flex flex-col justify-between backdrop-blur-md">
-        <span className="text-[11px] font-medium text-text-muted">الأسواق الممسوحة (Bybit)</span>
+        <span className="text-[11px] font-medium text-text-muted">الأسواق الممسوحة ({exMeta.shortName})</span>
         <div className="mt-1 flex items-baseline gap-2">
           <span className="text-xl font-black font-mono text-white">
             {totalFoundCount}

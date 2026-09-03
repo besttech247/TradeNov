@@ -1,6 +1,7 @@
 import React from 'react';
+import { EXCHANGES } from '../utils/radarEngine';
 
-export function RadarDetailPanel({ item }) {
+export function RadarDetailPanel({ item, selectedExchange }) {
   if (!item) {
     return (
       <div className="bg-background-light/40 border border-white/10 rounded-2xl p-6 text-center text-text-muted backdrop-blur-md">
@@ -18,6 +19,17 @@ export function RadarDetailPanel({ item }) {
 
   const isLong = item.direction === 'LONG';
   const rawSymbol = item.symbol.replace('USDT', '');
+  const exMeta = EXCHANGES[selectedExchange] || EXCHANGES.BINANCE_FUTURES;
+
+  const getExchangeLiveLink = () => {
+    if (selectedExchange === 'BYBIT') {
+      return `https://www.bybit.com/trade/usdt/${item.symbol}`;
+    }
+    if (selectedExchange === 'BINANCE_FUTURES') {
+      return `https://www.binance.com/en/futures/${item.symbol}`;
+    }
+    return `https://www.binance.com/en/trade/${rawSymbol}_USDT`;
+  };
 
   return (
     <div className="bg-background-light/40 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md">
@@ -35,6 +47,9 @@ export function RadarDetailPanel({ item }) {
               }`}>
                 {item.signal}
               </span>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono border ${exMeta.badgeColor}`}>
+                {exMeta.name}
+              </span>
             </div>
             <div className="text-xs text-text-muted font-mono mt-0.5">
               السعر اللحظي: <span className="text-white font-bold">${formatNum(item.price)}</span>
@@ -44,9 +59,9 @@ export function RadarDetailPanel({ item }) {
 
         {/* Score and External Links */}
         <div className="flex items-center gap-3">
-          {/* Quick TradingView / Bybit Links */}
+          {/* Quick TradingView / Exchange Links */}
           <a
-            href={`https://www.tradingview.com/chart/?symbol=BYBIT:${item.symbol}.P`}
+            href={`https://www.tradingview.com/chart/?symbol=${selectedExchange.startsWith('BINANCE') ? 'BINANCE' : 'BYBIT'}:${item.symbol}`}
             target="_blank"
             rel="noopener noreferrer"
             className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white text-xs font-mono transition-all"
@@ -54,12 +69,12 @@ export function RadarDetailPanel({ item }) {
             📊 TradingView
           </a>
           <a
-            href={`https://www.bybit.com/trade/usdt/${item.symbol}`}
+            href={getExchangeLiveLink()}
             target="_blank"
             rel="noopener noreferrer"
             className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white text-xs font-mono transition-all"
           >
-            ⚡ Bybit Live
+            ⚡ {exMeta.shortName} Live
           </a>
 
           {/* Score Badge */}

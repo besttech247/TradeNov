@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { EXCHANGES } from '../utils/radarEngine';
 
 export function RadarHeader({
+  selectedExchange,
+  onChangeExchange,
   status,
   isRunning,
   onStart,
@@ -67,7 +70,7 @@ export function RadarHeader({
           </Link>
 
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-cyan-600 to-indigo-600 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(245,158,11,0.3)]">
               🎯
             </div>
             <div>
@@ -75,12 +78,12 @@ export function RadarHeader({
                 <h1 className="text-lg sm:text-xl font-black tracking-tight text-white">
                   Crypto Intraday Radar
                 </h1>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 text-cyan-300 border border-cyan-500/30">
-                  v3.5 Bybit
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 via-cyan-500/20 to-indigo-500/20 text-cyan-300 border border-cyan-500/30">
+                  v3.5 Multi-Exchange
                 </span>
               </div>
               <p className="text-xs text-text-muted hidden sm:block">
-                رادار المضاربة اللحظية الخاطفة وتدفق السيولة وعمق الأوامر (Order Flow & CVD)
+                رادار المضاربة اللحظية الخاطفة وتدفق السيولة وعمق الأوامر (Binance & Bybit)
               </p>
             </div>
           </div>
@@ -88,6 +91,26 @@ export function RadarHeader({
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5 mr-auto">
+          {/* Exchange Switcher */}
+          <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/15">
+            {Object.values(EXCHANGES).map((ex) => (
+              <button
+                key={ex.id}
+                onClick={() => onChangeExchange(ex.id)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  selectedExchange === ex.id
+                    ? ex.id.startsWith('BINANCE')
+                      ? 'bg-amber-500 text-black font-black shadow-[0_0_10px_rgba(245,158,11,0.4)]'
+                      : 'bg-cyan-500 text-black font-black shadow-[0_0_10px_rgba(6,182,212,0.4)]'
+                    : 'text-text-muted hover:text-white'
+                }`}
+              >
+                <span>{ex.id.startsWith('BINANCE') ? '🟡' : '🔵'}</span>
+                <span>{ex.name}</span>
+              </button>
+            ))}
+          </div>
+
           {getStatusBadge()}
 
           {/* Countdown badge */}
@@ -147,7 +170,7 @@ export function RadarHeader({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="بحث عن رمز العملة (مثال: SOL, BTC, ETH)..."
+            placeholder="بحث عن رمز العملة (مثال: BTC, SOL, ETH, DOGE)..."
             className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-text-muted focus:outline-none focus:border-cyan-500/60 transition-all font-mono"
           />
           {searchQuery && (

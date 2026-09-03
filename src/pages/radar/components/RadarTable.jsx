@@ -1,10 +1,14 @@
 import React from 'react';
+import { EXCHANGES } from '../utils/radarEngine';
 
 export function RadarTable({
   rows,
   selectedSymbol,
-  onSelectSymbol
+  onSelectSymbol,
+  selectedExchange
 }) {
+  const exMeta = EXCHANGES[selectedExchange] || EXCHANGES.BINANCE_FUTURES;
+
   const formatNum = (val, decimals = 4) => {
     if (val === undefined || val === null || isNaN(val)) return '--';
     if (Math.abs(val) >= 1000) return Number(val).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -57,9 +61,9 @@ export function RadarTable({
     <div className="bg-background-light/40 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md">
       <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+          <span className={`w-2 h-2 rounded-full ${selectedExchange.startsWith('BINANCE') ? 'bg-amber-400' : 'bg-cyan-400'}`}></span>
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-            أفضل فرص المضاربة اللحظية والسيولة (Top Intraday Opportunities)
+            فرص المضاربة والسيولة اللحظية ({exMeta.name})
           </h2>
         </div>
         <span className="text-xs font-mono text-text-muted">

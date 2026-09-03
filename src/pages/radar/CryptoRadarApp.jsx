@@ -9,6 +9,8 @@ import './styles/radar.css';
 
 export default function CryptoRadarApp() {
   const {
+    selectedExchange,
+    changeExchange,
     isRunning,
     status,
     regime,
@@ -41,6 +43,8 @@ export default function CryptoRadarApp() {
       <div className="max-w-[1600px] mx-auto flex flex-col gap-5">
         {/* Header & Controls */}
         <RadarHeader
+          selectedExchange={selectedExchange}
+          onChangeExchange={changeExchange}
           status={status}
           isRunning={isRunning}
           onStart={startScanner}
@@ -60,6 +64,7 @@ export default function CryptoRadarApp() {
 
         {/* Top Metric Cards */}
         <RadarStatsBar
+          selectedExchange={selectedExchange}
           regime={regime}
           marketCount={marketCount}
           topItem={rows.length > 0 ? rows[0] : null}
@@ -72,10 +77,14 @@ export default function CryptoRadarApp() {
           rows={rows}
           selectedSymbol={selectedSymbol}
           onSelectSymbol={setSelectedSymbol}
+          selectedExchange={selectedExchange}
         />
 
         {/* Selected Symbol Detail Panel */}
-        <RadarDetailPanel item={selectedItem} />
+        <RadarDetailPanel
+          item={selectedItem}
+          selectedExchange={selectedExchange}
+        />
 
         {/* Live Execution Logs */}
         <RadarLogBox
@@ -87,7 +96,7 @@ export default function CryptoRadarApp() {
         {/* Dynamic Build Version Footer (Constitution Rule 7) */}
         <div className="mt-8 pt-5 border-t border-white/5 flex flex-wrap items-center justify-between gap-3 text-xs text-text-muted font-mono">
           <div>
-            Crypto Intraday Radar v3.5 • Bybit Linear Order Flow & CVD Engine
+            Crypto Intraday Radar v3.5 • Multi-Exchange Order Flow & CVD Engine (Binance & Bybit)
           </div>
           <div>
             Build: {typeof __BUILD_DATE__ !== 'undefined' ? new Date(__BUILD_DATE__).toLocaleString('ar-SA') : new Date().toLocaleDateString('ar-SA')}
