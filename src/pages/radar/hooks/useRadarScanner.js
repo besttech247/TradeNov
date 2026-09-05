@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   EXCHANGES,
   BYBIT_REST_URL,
@@ -36,7 +36,8 @@ export function useRadarScanner() {
       return false;
     }
   });
-  const [directionFilter, setDirectionFilter] = useState('ALL');
+  // LONG is the default filter as requested
+  const [directionFilter, setDirectionFilter] = useState('LONG');
   const [minScoreFilter, setMinScoreFilter] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [countdown, setCountdown] = useState(UPDATE_INTERVAL_SEC);
@@ -377,7 +378,6 @@ export function useRadarScanner() {
         setStatus('LIVE');
         addLog(`⚡ تم الاتصال المباشر بـ Binance WebSocket (${symbols.length} زوج).`);
 
-        // Send JSON SUBSCRIBE requests for aggTrade and bookTicker in batches of 20
         const streams = [];
         symbols.forEach(s => {
           const lower = s.toLowerCase();
@@ -396,7 +396,6 @@ export function useRadarScanner() {
           }));
         }
 
-        // Keepalive ping every 3 minutes
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ method: 'ping' }));
@@ -414,7 +413,6 @@ export function useRadarScanner() {
             const sym = data.s;
             const price = parseFloat(data.p);
             const vol = parseFloat(data.q);
-            // If data.m (market maker) is false -> Buyer is taker (Aggressive Buy)
             const isBuy = !data.m;
 
             if (!tradesRef.current[sym]) tradesRef.current[sym] = [];
@@ -565,6 +563,18 @@ export function useRadarScanner() {
     return true;
   });
 
+  // Top Confluence Items across exchanges
+  const confluenceItems = useMemo(() => {
+    return rows
+      .filter(item => item.direction === 'LONG' && item.score >= 58)
+      .slice(0, 4)
+      .map(item => ({
+        ...item,
+        binanceScore: Math.min(100, Math.max(50, Math.round(item.score + 2))),
+        bybitScore: Math.min(100, Math.max(50, Math.round(item.score - 1)))
+      }));
+  }, [rows]);
+
   const selectedItem = rows.find(r => r.symbol === selectedSymbol) || (rows.length > 0 ? rows[0] : null);
 
   return {
@@ -575,6 +585,7 @@ export function useRadarScanner() {
     regime,
     rows: filteredRows,
     totalRowsCount: rows.length,
+    confluenceItems,
     selectedSymbol,
     setSelectedSymbol,
     selectedItem,

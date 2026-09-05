@@ -2,6 +2,7 @@ import React from 'react';
 import { useRadarScanner } from './hooks/useRadarScanner';
 import { RadarHeader } from './components/RadarHeader';
 import { RadarStatsBar } from './components/RadarStatsBar';
+import { RadarConfluenceGrid } from './components/RadarConfluenceGrid';
 import { RadarTable } from './components/RadarTable';
 import { RadarDetailPanel } from './components/RadarDetailPanel';
 import { RadarLogBox } from './components/RadarLogBox';
@@ -16,6 +17,7 @@ export default function CryptoRadarApp() {
     regime,
     rows,
     totalRowsCount,
+    confluenceItems,
     selectedSymbol,
     setSelectedSymbol,
     selectedItem,
@@ -70,6 +72,13 @@ export default function CryptoRadarApp() {
           topItem={rows.length > 0 ? rows[0] : null}
           lastUpdated={lastUpdated}
           totalFoundCount={totalRowsCount}
+        />
+
+        {/* Cross-Exchange High Confluence Cards */}
+        <RadarConfluenceGrid
+          confluenceItems={confluenceItems}
+          onSelectSymbol={setSelectedSymbol}
+          selectedSymbol={selectedSymbol}
         />
 
         {/* Main Opportunities Table */}
