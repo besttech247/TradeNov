@@ -4,6 +4,7 @@ import { EXCHANGES } from '../utils/radarEngine';
 export function RadarStatsBar({
   selectedExchange,
   regime,
+  cmeGapInfo,
   marketCount,
   topItem,
   lastUpdated,
@@ -26,15 +27,15 @@ export function RadarStatsBar({
 
   const getRegimeLabel = () => {
     switch (regime) {
-      case 'BULLISH': return 'صاعد قوي (Bullish)';
-      case 'BEARISH': return 'هابط قوي (Bearish)';
-      case 'RANGE': return 'تذبذب عرضي (Range)';
+      case 'BULLISH': return 'صاعد قوي';
+      case 'BEARISH': return 'هابط قوي';
+      case 'RANGE': return 'تذبذب عرضي';
       default: return 'جاري التحديد...';
     }
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
       {/* 1. Market Regime (BTC Trend) */}
       <div className="p-3.5 rounded-2xl bg-background-light/40 border border-white/10 flex flex-col justify-between backdrop-blur-md">
         <span className="text-[11px] font-medium text-text-muted">اتجاه السوق (BTC REGIME)</span>
@@ -46,18 +47,36 @@ export function RadarStatsBar({
         </div>
       </div>
 
-      {/* 2. Monitored Markets */}
+      {/* 2. CME Gap & Institutional Compass */}
       <div className="p-3.5 rounded-2xl bg-background-light/40 border border-white/10 flex flex-col justify-between backdrop-blur-md">
-        <span className="text-[11px] font-medium text-text-muted">الأسواق الممسوحة ({exMeta.shortName})</span>
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-medium text-text-muted">فجوات CME المؤسساتية</span>
+          <span className="text-[9px] font-mono px-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">
+            CME Gap
+          </span>
+        </div>
+        <div className="mt-1 flex items-baseline justify-between font-mono">
+          <span className="text-sm font-bold text-amber-300">
+            {cmeGapInfo?.nearestGap ? `$${cmeGapInfo.nearestGap.toLocaleString()}` : '--'}
+          </span>
+          <span className="text-[10px] text-emerald-400 font-bold">
+            {cmeGapInfo?.status || 'مفتوحة'}
+          </span>
+        </div>
+      </div>
+
+      {/* 3. Monitored Markets */}
+      <div className="p-3.5 rounded-2xl bg-background-light/40 border border-white/10 flex flex-col justify-between backdrop-blur-md">
+        <span className="text-[11px] font-medium text-text-muted">الأسواق ({exMeta.shortName})</span>
         <div className="mt-1 flex items-baseline gap-2">
           <span className="text-xl font-black font-mono text-white">
             {totalFoundCount}
           </span>
-          <span className="text-[10px] text-text-muted font-mono">/ {marketCount} زوج</span>
+          <span className="text-[10px] text-text-muted font-mono">/ {marketCount}</span>
         </div>
       </div>
 
-      {/* 3. Top Score */}
+      {/* 4. Top Score */}
       <div className="p-3.5 rounded-2xl bg-background-light/40 border border-white/10 flex flex-col justify-between backdrop-blur-md">
         <span className="text-[11px] font-medium text-text-muted">أعلى تقييم (TOP SCORE)</span>
         <div className="mt-1 flex items-baseline gap-1.5">
@@ -68,7 +87,7 @@ export function RadarStatsBar({
         </div>
       </div>
 
-      {/* 4. Top Symbol */}
+      {/* 5. Top Symbol */}
       <div className="p-3.5 rounded-2xl bg-background-light/40 border border-white/10 flex flex-col justify-between backdrop-blur-md">
         <span className="text-[11px] font-medium text-text-muted">أقوى فرصة حالية</span>
         <div className="mt-1 flex items-center justify-between">
@@ -85,7 +104,7 @@ export function RadarStatsBar({
         </div>
       </div>
 
-      {/* 5. Last Updated */}
+      {/* 6. Last Updated */}
       <div className="col-span-2 md:col-span-1 p-3.5 rounded-2xl bg-background-light/40 border border-white/10 flex flex-col justify-between backdrop-blur-md">
         <span className="text-[11px] font-medium text-text-muted">آخر تحديث للبيانات</span>
         <div className="mt-1 flex items-center gap-1.5 font-mono text-xs text-white/80">

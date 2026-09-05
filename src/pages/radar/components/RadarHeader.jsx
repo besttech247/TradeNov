@@ -79,11 +79,11 @@ export function RadarHeader({
                   Crypto Intraday Radar
                 </h1>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 via-cyan-500/20 to-indigo-500/20 text-cyan-300 border border-cyan-500/30">
-                  v3.5 Multi-Exchange
+                  v3.5 Multi-Exchange Pro
                 </span>
               </div>
               <p className="text-xs text-text-muted hidden sm:block">
-                رادار المضاربة اللحظية الخاطفة وتدفق السيولة وعمق الأوامر (Binance & Bybit)
+                رادار المضاربة اللحظية الخاطفة وتدفق السيولة والـ CVD (Binance, Bybit, OKX & CME)
               </p>
             </div>
           </div>
@@ -92,21 +92,25 @@ export function RadarHeader({
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5 mr-auto">
           {/* Exchange Switcher */}
-          <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/15">
+          <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/15 flex-wrap gap-1">
             {Object.values(EXCHANGES).map((ex) => (
               <button
                 key={ex.id}
                 onClick={() => onChangeExchange(ex.id)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                   selectedExchange === ex.id
-                    ? ex.id.startsWith('BINANCE')
+                    ? ex.id === 'BINANCE_FUTURES'
                       ? 'bg-amber-500 text-black font-black shadow-[0_0_10px_rgba(245,158,11,0.4)]'
-                      : 'bg-cyan-500 text-black font-black shadow-[0_0_10px_rgba(6,182,212,0.4)]'
+                      : ex.id === 'OKX'
+                      ? 'bg-purple-500 text-white font-black shadow-[0_0_10px_rgba(168,85,247,0.4)]'
+                      : ex.id === 'BYBIT'
+                      ? 'bg-cyan-500 text-black font-black shadow-[0_0_10px_rgba(6,182,212,0.4)]'
+                      : 'bg-emerald-500 text-black font-black shadow-[0_0_10px_rgba(16,185,129,0.4)]'
                     : 'text-text-muted hover:text-white'
                 }`}
               >
-                <span>{ex.id.startsWith('BINANCE') ? '🟡' : '🔵'}</span>
-                <span>{ex.name}</span>
+                <span>{ex.icon}</span>
+                <span>{ex.shortName}</span>
               </button>
             ))}
           </div>
@@ -186,9 +190,9 @@ export function RadarHeader({
         {/* Direction Filter Tabs */}
         <div className="lg:col-span-4 flex items-center bg-black/40 p-1 rounded-xl border border-white/10">
           {[
+            { id: 'LONG', label: '🟢 LONG (الافتراضي)' },
             { id: 'ALL', label: 'الكل' },
             { id: 'STRONG', label: '🔥 قوية فقط' },
-            { id: 'LONG', label: '🟢 LONG' },
             { id: 'SHORT', label: '🔴 SHORT' }
           ].map((tab) => (
             <button
@@ -196,7 +200,7 @@ export function RadarHeader({
               onClick={() => setDirectionFilter(tab.id)}
               className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all ${
                 directionFilter === tab.id
-                  ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow'
+                  ? 'bg-gradient-to-r from-emerald-600 to-cyan-600 text-white shadow'
                   : 'text-text-muted hover:text-white'
               }`}
             >

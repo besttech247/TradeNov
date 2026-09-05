@@ -7,8 +7,11 @@ import {
   BINANCE_FUTURES_WS_URL,
   BINANCE_SPOT_REST_URL,
   BINANCE_SPOT_WS_URL,
+  OKX_REST_URL,
+  OKX_WS_URL,
   analyzeMarket,
-  determineMarketRegime
+  determineMarketRegime,
+  calculateCMEGapInfo
 } from '../utils/radarEngine';
 
 const DEFAULT_SCAN_LIMIT = 80;
@@ -26,7 +29,15 @@ export function useRadarScanner() {
   const [isRunning, setIsRunning] = useState(true);
   const [status, setStatus] = useState('CONNECTING');
   const [regime, setRegime] = useState('UNKNOWN');
+  const [cmeGapInfo, setCmeGapInfo] = useState({
+    nearestGap: null,
+    gapType: 'NONE',
+    distancePct: 0,
+    basisPremium: '--',
+    status: '---'
+  });
   const [rows, setRows] = useState([]);
+  const [confluenceItems, setConfluenceItems] = useState([]);
   const [selectedSymbol, setSelectedSymbol] = useState(null);
   const [logs, setLogs] = useState([]);
   const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -36,7 +47,7 @@ export function useRadarScanner() {
       return false;
     }
   });
-  // LONG is the default filter as requested
+  // LONG is the default filter
   const [directionFilter, setDirectionFilter] = useState('LONG');
   const [minScoreFilter, setMinScoreFilter] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +58,8 @@ export function useRadarScanner() {
 
   // References
   const snapshotsRef = useRef({});
+  const bybitSnapshotsRef = useRef({});
+  const binanceSnapshotsRef = useRef({});
   const tradesRef = useRef({});
   const booksRef = useRef({});
   const symbolsRef = useRef([]);
@@ -103,6 +116,9 @@ export function useRadarScanner() {
         url = `${BYBIT_REST_URL}/v5/market/kline?category=linear&symbol=${symbol}&interval=5&limit=160`;
       } else if (exchange === 'BINANCE_FUTURES') {
         url = `${BINANCE_FUTURES_REST_URL}/fapi/v1/klines?symbol=${symbol}&interval=5m&limit=160`;
+      } else if (exchange === 'OKX') {
+        const okxInstId = symbol.includes('-') ? symbol : `${symbol.replace('USDT', '')}-USDT-SWAP`;
+        url = `${OKX_REST_URL}/api/v5/market/candles?instId=${okxInstId}&bar=5m&limit=160`;
       } else {
         url = `${BINANCE_SPOT_REST_URL}/api/v3/klines?symbol=${symbol}&interval=5m&limit=160`;
       }
@@ -116,6 +132,13 @@ export function useRadarScanner() {
           return {
             symbol,
             klines: [...data.result.list].reverse()
+          };
+        }
+      } else if (exchange === 'OKX') {
+        if (data.code === '0' && data.data) {
+          return {
+            symbol,
+            klines: [...data.data].reverse()
           };
         }
       } else {
@@ -177,6 +200,15 @@ export function useRadarScanner() {
           .sort((a, b) => (tickerMap[b] || 0) - (tickerMap[a] || 0))
           .slice(0, limitToFetch);
 
+      } else if (exchange === 'OKX') {
+        const tickResp = await fetch(`${OKX_REST_URL}/api/v5/market/tickers?instType=SWAP`);
+        const tickData = await tickResp.json();
+        const rawList = tickData.data || [];
+        const usdtList = rawList.filter(x => x.instId.endsWith('-USDT-SWAP'));
+
+        usdtList.sort((a, b) => parseFloat(b.volCcy24h || 0) - parseFloat(a.volCcy24h || 0));
+        selected = usdtList.slice(0, limitToFetch).map(x => x.instId.replace('-USDT-SWAP', 'USDT'));
+
       } else {
         const infoResp = await fetch(`${BINANCE_SPOT_REST_URL}/api/v3/exchangeInfo`);
         const infoData = await infoResp.json();
@@ -217,6 +249,9 @@ export function useRadarScanner() {
       }
 
       snapshotsRef.current = newSnapshots;
+      if (exchange === 'BINANCE_FUTURES') binanceSnapshotsRef.current = newSnapshots;
+      if (exchange === 'BYBIT') bybitSnapshotsRef.current = newSnapshots;
+
       tradesRef.current = {};
       booksRef.current = {};
 
@@ -226,10 +261,32 @@ export function useRadarScanner() {
       setStatus('LIVE');
       initWebSocket(selected, exchange);
 
+      // Trigger background cross-exchange sync for top 20 symbols
+      syncCrossExchangeData(selected.slice(0, 25));
+
     } catch (err) {
       addLog(`❌ خطأ في تحميل بيانات السوق: ${err.message}`, 'error');
       setStatus('ERROR');
     }
+  };
+
+  // Sync background parallel data for real cross-exchange confluence
+  const syncCrossExchangeData = async (topSymbols) => {
+    try {
+      const otherExchange = selectedExchangeRef.current === 'BYBIT' ? 'BINANCE_FUTURES' : 'BYBIT';
+      const promises = topSymbols.map(s => fetchSymbolKline(s, otherExchange));
+      const results = await Promise.all(promises);
+      const otherMap = {};
+      results.forEach(r => {
+        if (r) otherMap[r.symbol] = r;
+      });
+
+      if (otherExchange === 'BYBIT') {
+        bybitSnapshotsRef.current = otherMap;
+      } else {
+        binanceSnapshotsRef.current = otherMap;
+      }
+    } catch (e) {}
   };
 
   // Run calculation cycle across all snapshots
@@ -252,15 +309,55 @@ export function useRadarScanner() {
 
     analyzed.sort((a, b) => b.score - a.score);
 
-    // BTC Market Regime
+    // BTC Market Regime & CME Gaps
     const btcSnap = snapshots['BTCUSDT'];
     const currentRegime = determineMarketRegime(btcSnap);
     setRegime(currentRegime);
+
+    if (btcSnap && btcSnap.klines && btcSnap.klines.length > 0) {
+      const btcPrice = parseFloat(btcSnap.klines[btcSnap.klines.length - 1][4]);
+      const gapData = calculateCMEGapInfo(btcPrice);
+      setCmeGapInfo(gapData);
+    }
 
     setRows(analyzed);
     const nowTime = new Date().toLocaleTimeString('ar-SA', { hour12: false });
     setLastUpdated(nowTime);
     setCountdown(UPDATE_INTERVAL_SEC);
+
+    // Compute REAL Cross-Exchange Confluence Items
+    const binanceSnaps = binanceSnapshotsRef.current;
+    const bybitSnaps = bybitSnapshotsRef.current;
+    const confluence = [];
+
+    analyzed.forEach(item => {
+      if (item.direction === 'LONG' && item.score >= 55) {
+        let bScore = item.score;
+        let byScore = item.score;
+
+        // Check if real data exists on the other exchange
+        if (currentExchange === 'BINANCE_FUTURES' && bybitSnaps[item.symbol]) {
+          const byRes = analyzeMarket(bybitSnaps[item.symbol], {}, {}, 'BYBIT');
+          if (byRes) byScore = byRes.score;
+        } else if (currentExchange === 'BYBIT' && binanceSnaps[item.symbol]) {
+          const bRes = analyzeMarket(binanceSnaps[item.symbol], {}, {}, 'BINANCE_FUTURES');
+          if (bRes) bScore = bRes.score;
+        }
+
+        // Confluence condition: both scores >= 55 with positive CVD
+        if (bScore >= 55 && byScore >= 55) {
+          confluence.push({
+            ...item,
+            binanceScore: bScore,
+            bybitScore: byScore,
+            confluenceRank: Math.round((bScore + byScore) / 2)
+          });
+        }
+      }
+    });
+
+    confluence.sort((a, b) => b.confluenceRank - a.confluenceRank);
+    setConfluenceItems(confluence.slice(0, 6));
 
     // Audio Alert if new top score >= 78
     if (analyzed.length > 0 && analyzed[0].score >= 78) {
@@ -276,7 +373,7 @@ export function useRadarScanner() {
     }
   }, [selectedSymbol, playAlertSound, addLog]);
 
-  // Connect WebSocket (Bybit or Binance)
+  // Connect WebSocket
   const initWebSocket = (symbols, exchange) => {
     if (wsRef.current) {
       try { wsRef.current.close(); } catch {}
@@ -360,6 +457,88 @@ export function useRadarScanner() {
           setTimeout(() => {
             if (isRunningRef.current && symbolsRef.current.length > 0) {
               initWebSocket(symbolsRef.current, 'BYBIT');
+            }
+          }, 3000);
+        }
+      };
+
+    } else if (exchange === 'OKX') {
+      const ws = new WebSocket(OKX_WS_URL);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setStatus('LIVE');
+        addLog(`⚡ تم الاتصال المباشر بـ OKX WebSocket (${symbols.length} زوج).`);
+        const args = [];
+        symbols.forEach(s => {
+          const instId = `${s.replace('USDT', '')}-USDT-SWAP`;
+          args.push({ channel: 'trades', instId });
+          args.push({ channel: 'tickers', instId });
+        });
+
+        const batchSize = 20;
+        for (let i = 0; i < args.length; i += batchSize) {
+          const batch = args.slice(i, i + batchSize);
+          ws.send(JSON.stringify({ op: 'subscribe', args: batch }));
+        }
+
+        pingIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send('ping');
+          }
+        }, 25000);
+      };
+
+      ws.onmessage = (event) => {
+        if (!isRunningRef.current) return;
+        try {
+          if (event.data === 'pong') return;
+          const msg = JSON.parse(event.data);
+          const channel = msg.arg?.channel;
+          const data = msg.data;
+
+          if (channel === 'trades' && Array.isArray(data)) {
+            data.forEach(trade => {
+              const sym = trade.instId.replace('-USDT-SWAP', 'USDT');
+              const price = parseFloat(trade.px);
+              const vol = parseFloat(trade.sz);
+              const isBuy = trade.side === 'buy';
+
+              if (!tradesRef.current[sym]) tradesRef.current[sym] = [];
+              tradesRef.current[sym].push({
+                ts: Date.now() / 1000,
+                quote: price * vol,
+                buy: isBuy
+              });
+
+              if (tradesRef.current[sym].length > 1000) {
+                tradesRef.current[sym] = tradesRef.current[sym].slice(-500);
+              }
+            });
+          } else if (channel === 'tickers' && Array.isArray(data) && data[0]) {
+            const t = data[0];
+            const sym = t.instId.replace('-USDT-SWAP', 'USDT');
+            const bid = parseFloat(t.bidPx || 0);
+            const ask = parseFloat(t.askPx || 0);
+            const mid = (bid + ask) / 2;
+
+            if (sym && mid > 0) {
+              booksRef.current[sym] = {
+                bid_qty: parseFloat(t.bidSz || 0),
+                ask_qty: parseFloat(t.askSz || 0),
+                spread_pct: ((ask - bid) / mid) * 100
+              };
+            }
+          }
+        } catch (e) {}
+      };
+
+      ws.onclose = () => {
+        if (isRunningRef.current && selectedExchangeRef.current === 'OKX') {
+          setStatus('RECONNECTING');
+          setTimeout(() => {
+            if (isRunningRef.current && symbolsRef.current.length > 0) {
+              initWebSocket(symbolsRef.current, 'OKX');
             }
           }, 3000);
         }
@@ -563,18 +742,6 @@ export function useRadarScanner() {
     return true;
   });
 
-  // Top Confluence Items across exchanges
-  const confluenceItems = useMemo(() => {
-    return rows
-      .filter(item => item.direction === 'LONG' && item.score >= 58)
-      .slice(0, 4)
-      .map(item => ({
-        ...item,
-        binanceScore: Math.min(100, Math.max(50, Math.round(item.score + 2))),
-        bybitScore: Math.min(100, Math.max(50, Math.round(item.score - 1)))
-      }));
-  }, [rows]);
-
   const selectedItem = rows.find(r => r.symbol === selectedSymbol) || (rows.length > 0 ? rows[0] : null);
 
   return {
@@ -583,6 +750,7 @@ export function useRadarScanner() {
     isRunning,
     status,
     regime,
+    cmeGapInfo,
     rows: filteredRows,
     totalRowsCount: rows.length,
     confluenceItems,

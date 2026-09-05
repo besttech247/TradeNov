@@ -5,7 +5,7 @@ export function RadarDetailPanel({ item, selectedExchange }) {
   if (!item) {
     return (
       <div className="bg-background-light/40 border border-white/10 rounded-2xl p-6 text-center text-text-muted backdrop-blur-md">
-        قم باختيار عملة من الجدول أعلاه لعرض التفاصيل الكاملة ومستويات الدخول والأهداف...
+        قم باختيار عملة من الجدول أو بطاقات التوافق أعلاه لعرض التفاصيل ومستويات الدخول والأهداف...
       </div>
     );
   }
@@ -36,10 +36,19 @@ export function RadarDetailPanel({ item, selectedExchange }) {
     if (selectedExchange === 'BYBIT') {
       return `https://www.bybit.com/trade/usdt/${item.symbol}`;
     }
+    if (selectedExchange === 'OKX') {
+      return `https://www.okx.com/trade-swap/${rawSymbol.toLowerCase()}-usdt-swap`;
+    }
     if (selectedExchange === 'BINANCE_FUTURES') {
       return `https://www.binance.com/en/futures/${item.symbol}`;
     }
     return `https://www.binance.com/en/trade/${rawSymbol}_USDT`;
+  };
+
+  const getTradingViewSymbol = () => {
+    if (selectedExchange === 'OKX') return `OKX:${rawSymbol}USDT.P`;
+    if (selectedExchange === 'BYBIT') return `BYBIT:${item.symbol}.P`;
+    return `BINANCE:${item.symbol}`;
   };
 
   return (
@@ -72,7 +81,7 @@ export function RadarDetailPanel({ item, selectedExchange }) {
         <div className="flex items-center gap-3">
           {/* Quick TradingView / Exchange Links */}
           <a
-            href={`https://www.tradingview.com/chart/?symbol=${selectedExchange.startsWith('BINANCE') ? 'BINANCE' : 'BYBIT'}:${item.symbol}`}
+            href={`https://www.tradingview.com/chart/?symbol=${getTradingViewSymbol()}`}
             target="_blank"
             rel="noopener noreferrer"
             className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white text-xs font-mono transition-all"

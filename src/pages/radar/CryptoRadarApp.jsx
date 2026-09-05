@@ -15,6 +15,7 @@ export default function CryptoRadarApp() {
     isRunning,
     status,
     regime,
+    cmeGapInfo,
     rows,
     totalRowsCount,
     confluenceItems,
@@ -64,17 +65,18 @@ export default function CryptoRadarApp() {
           marketCount={marketCount}
         />
 
-        {/* Top Metric Cards */}
+        {/* Top Metric Cards including CME Gaps */}
         <RadarStatsBar
           selectedExchange={selectedExchange}
           regime={regime}
+          cmeGapInfo={cmeGapInfo}
           marketCount={marketCount}
           topItem={rows.length > 0 ? rows[0] : null}
           lastUpdated={lastUpdated}
           totalFoundCount={totalRowsCount}
         />
 
-        {/* Cross-Exchange High Confluence Cards */}
+        {/* Cross-Exchange High Confluence (Cards & Table) */}
         <RadarConfluenceGrid
           confluenceItems={confluenceItems}
           onSelectSymbol={setSelectedSymbol}
@@ -105,7 +107,7 @@ export default function CryptoRadarApp() {
         {/* Dynamic Build Version Footer (Constitution Rule 7) */}
         <div className="mt-8 pt-5 border-t border-white/5 flex flex-wrap items-center justify-between gap-3 text-xs text-text-muted font-mono">
           <div>
-            Crypto Intraday Radar v3.5 • Multi-Exchange Order Flow & CVD Engine (Binance & Bybit)
+            Crypto Intraday Radar v3.5 Pro • Multi-Exchange Order Flow, CME Gaps & CVD Engine (Binance, Bybit & OKX)
           </div>
           <div>
             Build: {typeof __BUILD_DATE__ !== 'undefined' ? new Date(__BUILD_DATE__).toLocaleString('ar-SA') : new Date().toLocaleDateString('ar-SA')}
